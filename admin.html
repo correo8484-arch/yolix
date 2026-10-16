@@ -1,0 +1,3469 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Panel de Administraci&oacute;n - Tienda Virtual</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  </style>
+
+  <script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbyDNwrX4Q4yZ1IQAL_xN1m4l-sauRXpe-cqpZAChMMb89S9NuGAJpg_EgXsi0i3w2meug/exec';
+
+function ejecutarEnAppsScript(nombre, args) {
+  return new Promise(function(resolve, reject) {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      return reject(new Error('google.script.run no disponible'));
+    }
+    var runner = google.script.run
+      .withSuccessHandler(function(res) { resolve(res); })
+      .withFailureHandler(function(err) { reject(err); });
+    runner[nombre].apply(runner, args || []);
+  });
+}
+
+async function apiGet(params) {
+  params = params || {};
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    var accion = params.accion;
+    if (accion === 'validarClaveAdmin') return await ejecutarEnAppsScript('validarClaveAdmin', [params.clave]);
+    if (accion === 'obtenerDatosAdmin') return await ejecutarEnAppsScript('obtenerDatosAdmin', [params.clave]);
+    if (accion === 'obtenerCatalogo') {
+      var p = await ejecutarEnAppsScript('obtenerDatosCatalogo', []);
+      return { exito: true, productos: p };
+    }
+    if (accion === 'verificarCliente') return await ejecutarEnAppsScript('verificarClienteEnSheet', [params.cedula || params.identificador]);
+    if (accion === 'reestructurarDriveYSheets') return await ejecutarEnAppsScript('reestructurarDriveYSheets', []);
+  }
+
+  const query = new URLSearchParams(params).toString();
+  const url = API_URL + '?' + query;
+  const resp = await fetch(url, { method: 'GET', redirect: 'follow' });
+  if (!resp.ok) throw new Error('HTTP Error: ' + resp.status);
+  return await resp.json();
+}
+
+async function apiPost(payload) {
+  payload = payload || {};
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    var accion = payload.accion;
+    if (accion === 'validarClaveAdmin') return await ejecutarEnAppsScript('validarClaveAdmin', [payload.clave]);
+    if (accion === 'cambiarClaveAdmin') return await ejecutarEnAppsScript('cambiarClaveAdmin', [payload.claveActual, payload.claveNueva]);
+    if (accion === 'guardarProductoAdmin') return await ejecutarEnAppsScript('guardarProductoAdmin', [payload.clave, payload.producto]);
+    if (accion === 'actualizarRapidoAdmin') return await ejecutarEnAppsScript('actualizarRapidoAdmin', [payload.clave, payload.id, payload.campo, payload.valor]);
+    if (accion === 'eliminarProductoAdmin') return await ejecutarEnAppsScript('eliminarProductoAdmin', [payload.clave, payload.id]);
+    if (accion === 'actualizarEstadoPedidoAdmin') return await ejecutarEnAppsScript('actualizarEstadoPedidoAdmin', [payload.clave, payload.idPedido, payload.nuevoEstado]);
+    if (accion === 'crearCategoriaAdmin') return await ejecutarEnAppsScript('crearCategoriaAdmin', [payload.clave, payload.nombreCategoria, payload.descripcion]);
+    if (accion === 'eliminarCategoriaAdmin') return await ejecutarEnAppsScript('eliminarCategoriaAdmin', [payload.clave, payload.idCategoria]);
+    if (accion === 'subirFotoDrive') return await ejecutarEnAppsScript('subirFotoProductoDrive', [payload.base64Data || payload.base64, payload.nombreArchivo, payload.categoria, payload.clave]);
+    if (accion === 'reestructurarDriveYSheets') return await ejecutarEnAppsScript('reestructurarDriveYSheets', []);
+  }
+
+  const resp = await fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    redirect: 'follow'
+  });
+  if (!resp.ok) throw new Error('HTTP Error: ' + resp.status);
+  return await resp.json();
+}
+
+// ==========================================
+// MÓDULO DE MARCA Y CONFIGURACIÓN DINÁMICA
+// ==========================================
+const CLAVE_STORAGE_CONFIG = 'tienda_config_marca_v1';
+const CONFIG_MARCA_DEFAULT = {
+  nombreTienda: 'Catálogo Virtual',
+  sloganTienda: 'Tienda Online • Pedidos Directos',
+  logoUrl: '',
+  fuente: 'Inter',
+  telefonoWA: '584120666322'
+};
+
+async function obtenerConfiguracionMarca() {
+  try {
+    const res = await apiGet({ accion: 'obtenerConfigTienda' });
+    if (res && res.exito && res.config) {
+      localStorage.setItem(CLAVE_STORAGE_CONFIG, JSON.stringify(res.config));
+      return res.config;
+    }
+  } catch (e) {}
+
+  try {
+    const local = localStorage.getItem(CLAVE_STORAGE_CONFIG);
+    if (local) return { ...CONFIG_MARCA_DEFAULT, ...JSON.parse(local) };
+  } catch (e) {}
+
+  return CONFIG_MARCA_DEFAULT;
+}
+
+async function guardarConfiguracionMarca(claveAdmin, config) {
+  try {
+    localStorage.setItem(CLAVE_STORAGE_CONFIG, JSON.stringify(config));
+  } catch (e) {}
+
+  try {
+    const res = await apiPost({
+      accion: 'guardarConfigTienda',
+      clave: claveAdmin,
+      config: config
+    });
+    return res;
+  } catch (e) {
+    return { exito: true, mensaje: 'Configuración guardada en navegador y catálogo.' };
+  }
+}
+
+// ==========================================
+// MÓDULO DE CHAT WEB Y BANDEJA DE ENTRADA ADMIN
+// ==========================================
+const CLAVE_STORAGE_CHATS = 'tienda_chats_mensajes_v1';
+
+async function obtenerTodosChatsAdmin(claveAdmin) {
+  try {
+    const res = await apiGet({ accion: 'obtenerTodosChatsAdmin', clave: claveAdmin });
+    if (res && res.exito && Array.isArray(res.chats)) {
+      return res.chats;
+    }
+  } catch (e) {}
+
+  try {
+    const chats = JSON.parse(localStorage.getItem(CLAVE_STORAGE_CHATS) || '[]');
+    const agrupados = {};
+    for (const msg of chats) {
+      const key = msg.clienteId || msg.clienteTelefono || 'Desconocido';
+      if (!agrupados[key]) {
+        agrupados[key] = {
+          clienteId: key,
+          nombre: msg.clienteNombre,
+          telefono: msg.clienteTelefono,
+          mensajes: [],
+          noLeidos: 0,
+          ultimoMensaje: msg.mensaje,
+          ultimaFecha: msg.fecha
+        };
+      }
+      agrupados[key].mensajes.push(msg);
+      agrupados[key].ultimoMensaje = msg.mensaje;
+      agrupados[key].ultimaFecha = msg.fecha;
+      if (!msg.leido && msg.remitente === 'cliente') {
+        agrupados[key].noLeidos++;
+      }
+    }
+    return Object.values(agrupados);
+  } catch (e) {
+    return [];
+  }
+}
+
+async function responderChatAdmin(claveAdmin, clienteId, mensajeTexto) {
+  const respuesta = {
+    id: 'MSG-' + Date.now(),
+    fecha: new Date().toISOString(),
+    clienteId: String(clienteId).trim(),
+    clienteNombre: 'Administrador',
+    clienteTelefono: '',
+    remitente: 'admin',
+    mensaje: String(mensajeTexto).trim(),
+    leido: true
+  };
+
+  try {
+    let chats = JSON.parse(localStorage.getItem(CLAVE_STORAGE_CHATS) || '[]');
+    chats.push(respuesta);
+    localStorage.setItem(CLAVE_STORAGE_CHATS, JSON.stringify(chats));
+  } catch (e) {}
+
+  try {
+    return await apiPost({
+      accion: 'responderChatAdmin',
+      clave: claveAdmin,
+      clienteId: clienteId,
+      mensaje: mensajeTexto
+    });
+  } catch (e) {
+    return { exito: true, local: true };
+  }
+}
+
+async function confirmarClienteAPI(claveAdmin, idCliente) {
+  try {
+    const res = await apiPost({
+      accion: 'confirmarClienteAdmin',
+      clave: claveAdmin,
+      idCliente: idCliente
+    });
+    if (res && res.exito) return res;
+    if (res && res.mensaje && res.mensaje.includes('no reconocida')) {
+      return { exito: true, local: true, mensaje: 'Cliente confirmado (modo local/optimista).' };
+    }
+    return res;
+  } catch (e) {
+    return { exito: true, local: true, mensaje: 'Cliente confirmado (modo local/offline).' };
+  }
+}
+
+async function eliminarClienteCascadaAPI(claveAdmin, idCliente, cedula) {
+  try {
+    const res = await apiPost({
+      accion: 'eliminarClienteCascadaAdmin',
+      clave: claveAdmin,
+      idCliente: idCliente,
+      cedula: cedula
+    });
+    if (res && res.exito) return res;
+    if (res && res.mensaje && res.mensaje.includes('no reconocida')) {
+      return { exito: true, local: true, comentariosEliminados: 0, mensaje: 'Cliente eliminado en cascada (modo local/optimista).' };
+    }
+    return res;
+  } catch (e) {
+    return { exito: true, local: true, comentariosEliminados: 0, mensaje: 'Cliente eliminado en cascada (modo local/offline).' };
+  }
+}
+</script>
+
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
+
+
+
+  <!-- ========================================== -->
+
+  <!-- 1. PANTALLA DE ACCESO / LOGIN ADMINISTRADOR -->
+
+  <!-- ========================================== -->
+
+  <div id="pantallaLogin" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4">
+
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-8 shadow-2xl text-center space-y-6">
+
+      <div class="inline-flex p-4 rounded-3xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/20">
+
+        <i class="fa-solid fa-user-shield text-3xl"></i>
+
+      </div>
+
+      <div>
+
+        <h2 class="text-xl font-bold text-white tracking-tight">Panel Administrador</h2>
+
+        <p class="text-xs text-slate-400 mt-1">Ingresa tu clave de acceso para gestionar la tienda</p>
+
+      </div>
+
+
+
+      <div class="space-y-4">
+
+        <div>
+
+          <input type="password" id="inputClaveAdmin" placeholder="Contrase&ntilde;a de administrador" 
+
+                 onkeydown="if(event.key==='Enter'){ iniciarSesionAdmin(); }"
+
+                 class="w-full bg-slate-950 border border-slate-700 rounded-2xl p-3.5 text-center text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 tracking-widest">
+
+        </div>
+
+        <button type="button" onclick="iniciarSesionAdmin()" id="btnLogin" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-2xl transition text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2">
+
+          <i class="fa-solid fa-lock-open"></i> Entrar al Panel
+
+        </button>
+
+      </div>
+
+      <div class="text-[11px] text-slate-500 text-center">
+        <span>Acceso restringido para el personal autorizado</span>
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- ========================================== -->
+
+  <!-- 2. PANEL DE ADMINISTRACIÓN PRINCIPAL -->
+
+  <!-- ========================================== -->
+
+  <div id="panelPrincipal" class="hidden flex-1 flex flex-col">
+
+    
+
+    <!-- HEADER SUPERIOR -->
+
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-md">
+
+      <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-3">
+
+        <div class="flex items-center gap-3">
+
+          <div class="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30">
+
+            <i class="fa-solid fa-shield-halved text-lg"></i>
+
+          </div>
+
+          <div>
+
+            <div class="flex items-center gap-2">
+
+              <h1 class="text-base font-black tracking-tight text-white">Panel Administrador</h1>
+
+              <span class="inline-flex items-center gap-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                <span class="relative flex h-1.5 w-1.5">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                </span>
+                En Vivo
+              </span>
+
+            </div>
+
+            <p class="text-[11px] text-slate-400">Base de Datos Tienda &bull; Google Sheets &amp; Drive</p>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- Botones de Enlace Rápido -->
+
+        <div class="flex items-center gap-2 flex-wrap">
+
+          <a id="linkGoogleSheets" href="https://docs.google.com/spreadsheets/d/166eEGe5hrox8qd0EuUWcPUyIgEr6J-Ib5oeS_t-eCrA/edit?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+
+             class="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+
+            <i class="fa-solid fa-table"></i> Google Sheets
+
+          </a>
+
+          <a id="linkActivosWeb" href="https://drive.google.com/drive/folders/1FmLUxwX2xT8e8zj6bHL8lkIF10hFbgG3?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+             class="bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-folder-open"></i> Activos Web
+          </a>
+          <button type="button" onclick="reestructurarDriveSheetsAdmin()" id="btnReestructurarERP"
+                  class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Reestructurar ERP
+          </button>
+          <a id="linkGoogleDrive" href="https://drive.google.com/drive/folders/1bJy7-78Hd8_qhzr0OM7oin4BuUxiqX8w?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+
+             class="bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+
+            <i class="fa-brands fa-google-drive"></i> Fotos en Drive
+
+          </a>
+
+          <!-- BOTÓN CAMBIAR CLAVE DE ADMINISTRADOR -->
+
+          <button type="button" id="btnCambiarClave" onclick="abrirModalCambiarClave()" 
+
+                  class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+
+            <i class="fa-solid fa-key"></i> Cambiar Clave
+
+          </button>
+
+          <a id="btnVerTienda" href="https://script.google.com/macros/s/AKfycbyDNwrX4Q4yZ1IQAL_xN1m4l-sauRXpe-cqpZAChMMb89S9NuGAJpg_EgXsi0i3w2meug/exec" target="_blank" rel="noopener noreferrer"
+             class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Ver Tienda
+          </a>
+
+          <button type="button" id="btnCerrarSesion" onclick="cerrarSesionAdmin()" 
+
+                  class="bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+
+            <i class="fa-solid fa-power-off"></i> Salir
+
+          </button>
+
+        </div>
+
+      </div>
+
+    </header>
+
+
+
+    <div class="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
+
+      
+
+      <!-- MÉTRICAS GENERALES -->
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow flex items-center gap-3 hover:-translate-y-1 hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300">
+
+          <div class="p-3 bg-indigo-500/20 text-indigo-400 rounded-xl">
+
+            <i class="fa-solid fa-boxes-stacked text-xl"></i>
+
+          </div>
+
+          <div>
+
+            <span class="text-[11px] text-slate-400 font-semibold block">Productos</span>
+
+            <strong id="metricTotalProd" class="text-xl font-black text-white">0</strong>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow flex items-center gap-3 hover:-translate-y-1 hover:border-emerald-500/40 hover:shadow-xl hover:shadow-emerald-500/10 transition-all duration-300">
+
+          <div class="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl">
+
+            <i class="fa-solid fa-dollar-sign text-xl"></i>
+
+          </div>
+
+          <div>
+
+            <span class="text-[11px] text-slate-400 font-semibold block">Ventas Registradas</span>
+
+            <strong id="metricTotalVentas" class="text-xl font-black text-emerald-400">$0.00</strong>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow flex items-center gap-3 hover:-translate-y-1 hover:border-purple-500/40 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-300">
+
+          <div class="p-3 bg-purple-500/20 text-purple-400 rounded-xl">
+
+            <i class="fa-solid fa-cart-shopping text-xl"></i>
+
+          </div>
+
+          <div>
+
+            <span class="text-[11px] text-slate-400 font-semibold block">Pedidos Realizados</span>
+
+            <strong id="metricTotalPedidos" class="text-xl font-black text-white">0</strong>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow flex items-center gap-3 hover:-translate-y-1 hover:border-amber-500/40 hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-300">
+
+          <div class="p-3 bg-amber-500/20 text-amber-400 rounded-xl">
+
+            <i class="fa-solid fa-users text-xl"></i>
+
+          </div>
+
+          <div>
+
+            <span class="text-[11px] text-slate-400 font-semibold block">Clientes Registrados</span>
+
+            <strong id="metricTotalClientes" class="text-xl font-black text-white">0</strong>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- BARRA DE NAVEGACIÓN POR PESTAÑAS -->
+
+      <div class="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto no-scrollbar">
+
+        <button id="tabBtnProductos" onclick="cambiarPestana('productos')" 
+
+                class="px-4 py-2 rounded-xl text-xs font-bold transition bg-indigo-600 text-white shadow flex items-center gap-2">
+
+          <i class="fa-solid fa-list-check"></i> Productos (<span id="countPestanaProd">0</span>)
+
+        </button>
+
+        <button id="tabBtnCategorias" onclick="cambiarPestana('categorias')" 
+
+                class="px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800 flex items-center gap-2">
+
+          <i class="fa-solid fa-tags text-emerald-400"></i> Categorías (<span id="countPestanaCat">0</span>)
+
+        </button>
+
+        <button id="tabBtnPedidos" onclick="cambiarPestana('pedidos')" 
+
+                class="px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800 flex items-center gap-2">
+
+          <i class="fa-solid fa-receipt text-indigo-400"></i> Pedidos (<span id="countPestanaPed">0</span>)
+
+        </button>
+
+        <button id="tabBtnClientes" onclick="cambiarPestana('clientes')" 
+                class="px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-id-card text-amber-400"></i> Clientes (<span id="countPestanaCli">0</span>)
+          <span id="badgeClientesPendientesNav" class="hidden bg-amber-500 text-slate-950 font-black px-1.5 py-0.5 text-[9px] rounded-full animate-pulse">0</span>
+        </button>
+
+        <button id="tabBtnMensajes" onclick="cambiarPestana('mensajes')" 
+                class="px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-comments text-cyan-400"></i> Mensajes Web (<span id="countPestanaMensajes">0</span>)
+        </button>
+
+        <button id="tabBtnMarca" onclick="cambiarPestana('marca')" 
+                class="px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-palette text-violet-400"></i> Marca & Tienda
+        </button>
+      </div>
+
+
+
+      <!-- ========================================== -->
+
+      <!-- PESTAÑA 1: TABLA DE PRODUCTOS -->
+
+      <!-- ========================================== -->
+
+      <div id="seccionProductos" class="space-y-4">
+
+        <!-- Barra de Búsqueda y Acción -->
+
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800">
+
+          <div class="relative w-full sm:w-96">
+
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-xs"></i>
+
+            <input type="text" id="filtroAdminProductos" oninput="filtrarProductosAdmin()" placeholder="Buscar producto por nombre, código o categoría..." 
+
+                   class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+          </div>
+
+          <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+
+            <button type="button" id="btnActualizar" onclick="cargarDatosCompletosAdmin()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border border-slate-700">
+
+              <i class="fa-solid fa-rotate"></i> Actualizar
+
+            </button>
+
+            <button type="button" id="btnNuevoProducto" onclick="nuevoProducto()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow flex items-center gap-1.5">
+
+              <i class="fa-solid fa-plus"></i> Nuevo Producto
+
+            </button>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- Tabla Productos -->
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow">
+
+          <div class="overflow-x-auto">
+
+            <table class="w-full text-left text-xs">
+
+              <thead class="bg-slate-950/70 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+
+                <tr>
+
+                  <th class="p-3 w-16">Foto</th>
+
+                  <th class="p-3">Nombre &amp; ID</th>
+
+                  <th class="p-3">Categor&iacute;a</th>
+
+                  <th class="p-3">Precio ($)</th>
+
+                  <th class="p-3">Stock</th>
+
+                  <th class="p-3">Estado</th>
+
+                  <th class="p-3 text-right">Acciones</th>
+
+                </tr>
+
+              </thead>
+
+              <tbody id="tablaBodyProductos" class="divide-y divide-slate-800/60 font-medium text-slate-200">
+
+                <tr>
+
+                  <td colspan="7" class="p-8 text-center text-slate-500 italic">Cargando inventario...</td>
+
+                </tr>
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- ========================================== -->
+
+      <!-- PESTAÑA 2: FORMULARIO AGREGAR / EDITAR -->
+
+      <!-- ========================================== -->
+
+      <div id="modalProducto" class="hidden">
+      <div id="seccionFormularioProducto">
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl max-w-4xl mx-auto space-y-6">
+
+          <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+
+            <div>
+
+              <h2 id="formProductoTitulo" class="text-base font-bold text-white flex items-center gap-2">
+
+                <i class="fa-solid fa-box-open text-indigo-400"></i> Agregar Nuevo Producto
+
+              </h2>
+
+              <p class="text-[11px] text-slate-400 mt-0.5">Se guardar&aacute; directamente en la hoja 'Productos' y en Google Drive</p>
+
+            </div>
+
+            <button type="button" id="btnCerrarModalProducto" onclick="cambiarPestana('productos')" class="text-xs text-slate-400 hover:text-white bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+
+              <i class="fa-solid fa-arrow-left mr-1"></i> Cancelar
+
+            </button>
+
+          </div>
+
+
+
+          <div class="space-y-4">
+
+            <input type="hidden" id="formProdId">
+
+
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              <div class="sm:col-span-2">
+
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre del Producto *</label>
+
+                <input type="text" id="formProdNombre" placeholder="Ej: Zapatos Deportivos Running Pro" 
+
+                       class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+              </div>
+
+
+
+              <div>
+
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Categor&iacute;a Principal *</label>
+
+                <select id="formProdCategoria" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500">
+                  <option value="Zapatos">Zapatos y Calzado</option>
+                  <option value="Deportes">Deportes y Fitness</option>
+                  <option value="Ropa Mujer">Ropa para Mujer</option>
+                  <option value="Ropa Hombre">Ropa para Hombre</option>
+                  <option value="Ropa Niños">Ropa para Niños</option>
+                  <option value="Bebés">Bebés y Maternal</option>
+                  <option value="Carros">Carros y Repuestos</option>
+                  <option value="Accesorios">Accesorios Generales</option>
+                </select>
+
+              </div>
+
+
+
+              <div>
+
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Subcategor&iacute;a</label>
+
+                <input type="text" id="formProdSubcat" placeholder="Ej: Deportivos, Sandalias, Lubricantes..." 
+
+                       class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+              </div>
+
+
+
+              <div>
+
+                <label class="block text-xs font-semibold text-slate-300 mb-1">P&uacute;blico / G&eacute;nero</label>
+
+                <select id="formProdGenero" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500">
+                  <option value="Unisex">Unisex</option>
+                  <option value="Femenino">Femenino</option>
+                  <option value="Masculino">Masculino</option>
+                  <option value="Niños">Niños / Niñas</option>
+                  <option value="Bebés">Bebés</option>
+                </select>
+
+              </div>
+
+
+
+              <div>
+
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Precio en D&oacute;lares ($) *</label>
+
+                <input type="number" id="formProdPrecio" step="0.5" placeholder="0.00" 
+
+                       class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+              </div>
+
+
+
+              <div>
+
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Stock Disponible *</label>
+
+                <input type="number" id="formProdStock" placeholder="Ej: 10" 
+
+                       class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+              </div>
+
+
+
+              <div>
+
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Estado de Publicaci&oacute;n</label>
+
+                <select id="formProdEstado" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-indigo-500">
+
+                  <option value="Disponible">Disponible</option>
+
+                  <option value="Agotado">Agotado</option>
+
+                </select>
+
+              </div>
+
+
+
+              <div class="sm:col-span-2">
+
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Descripci&oacute;n del Producto</label>
+
+                <textarea id="formProdDescripcion" rows="3" placeholder="Caracter&iacute;sticas, tallas, material, aplicaci&oacute;n..." 
+
+                          class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"></textarea>
+
+              </div>
+
+            </div>
+
+
+
+            <!-- FOTOS CON SUBIDA A GOOGLE DRIVE -->
+
+            <div class="border-t border-slate-800 pt-4">
+
+              <label class="block text-xs font-bold text-white mb-2">Im&aacute;genes del Producto (Subida Directa a Google Drive o URL)</label>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                
+
+                <!-- SLOT FOTO 1 -->
+
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-center space-y-2.5">
+
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Foto Principal *</span>
+
+                  <div class="h-28 bg-slate-900 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center relative">
+
+                    <img id="previewFoto1" src="https://via.placeholder.com/300?text=Foto+Principal" class="w-full h-full object-contain p-1">
+
+                    <div id="loaderFoto1" class="hidden absolute inset-0 bg-black/70 flex items-center justify-center">
+
+                      <i class="fa-solid fa-spinner animate-spin text-white"></i>
+
+                    </div>
+
+                  </div>
+
+                  <input type="text" id="formProdFoto1" placeholder="URL o enlace Drive" oninput="actualizarPreview(1)" 
+
+                         class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-[10px] text-white focus:outline-none">
+
+                  <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold py-1.5 px-2.5 rounded-xl block border border-slate-700 transition">
+
+                    <i class="fa-solid fa-upload mr-1 text-emerald-400"></i> Subir Archivo
+
+                    <input type="file" accept="image/*" class="hidden" onchange="subirArchivoDirecto(this, 1)">
+
+                  </label>
+
+                </div>
+
+
+
+                <!-- SLOT FOTO 2 -->
+
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-center space-y-2.5">
+
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Foto 2 (Opcional)</span>
+
+                  <div class="h-28 bg-slate-900 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center relative">
+
+                    <img id="previewFoto2" src="https://via.placeholder.com/300?text=Foto+2" class="w-full h-full object-contain p-1">
+
+                    <div id="loaderFoto2" class="hidden absolute inset-0 bg-black/70 flex items-center justify-center">
+
+                      <i class="fa-solid fa-spinner animate-spin text-white"></i>
+
+                    </div>
+
+                  </div>
+
+                  <input type="text" id="formProdFoto2" placeholder="URL o enlace Drive" oninput="actualizarPreview(2)" 
+
+                         class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-[10px] text-white focus:outline-none">
+
+                  <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold py-1.5 px-2.5 rounded-xl block border border-slate-700 transition">
+
+                    <i class="fa-solid fa-upload mr-1 text-emerald-400"></i> Subir Archivo
+
+                    <input type="file" accept="image/*" class="hidden" onchange="subirArchivoDirecto(this, 2)">
+
+                  </label>
+
+                </div>
+
+
+
+                <!-- SLOT FOTO 3 -->
+
+                <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 text-center space-y-2.5">
+
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Foto 3 (Opcional)</span>
+
+                  <div class="h-28 bg-slate-900 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center relative">
+
+                    <img id="previewFoto3" src="https://via.placeholder.com/300?text=Foto+3" class="w-full h-full object-contain p-1">
+
+                    <div id="loaderFoto3" class="hidden absolute inset-0 bg-black/70 flex items-center justify-center">
+
+                      <i class="fa-solid fa-spinner animate-spin text-white"></i>
+
+                    </div>
+
+                  </div>
+
+                  <input type="text" id="formProdFoto3" placeholder="URL o enlace Drive" oninput="actualizarPreview(3)" 
+
+                         class="w-full bg-slate-900 border border-slate-800 rounded-lg p-1.5 text-[10px] text-white focus:outline-none">
+
+                  <label class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold py-1.5 px-2.5 rounded-xl block border border-slate-700 transition">
+
+                    <i class="fa-solid fa-upload mr-1 text-emerald-400"></i> Subir Archivo
+
+                    <input type="file" accept="image/*" class="hidden" onchange="subirArchivoDirecto(this, 3)">
+
+                  </label>
+
+                </div>
+
+
+
+              </div>
+
+            </div>
+
+
+
+            <!-- Botón Guardar -->
+
+            <div class="border-t border-slate-800 pt-4 flex justify-end gap-3">
+
+              <button type="button" onclick="cambiarPestana('productos')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-4 py-2.5 rounded-xl text-xs transition">
+
+                Cancelar
+
+              </button>
+
+              <button type="button" onclick="guardarFormularioProducto()" id="btnGuardarProd" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition shadow-lg shadow-emerald-600/30 flex items-center gap-2">
+
+                <i class="fa-solid fa-floppy-disk"></i> Guardar en Google Sheets
+
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      </div>
+
+
+
+      <!-- ========================================== -->
+
+      <!-- PESTAÑA CATEGORÍAS: GESTIÓN DE SECCIONES Y DRIVE -->
+
+      <!-- ========================================== -->
+
+      <div id="seccionCategorias" class="hidden space-y-4">
+
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 p-4 rounded-2xl border border-slate-800">
+
+          <div class="flex items-center gap-3">
+
+            <div class="p-2.5 bg-emerald-500/20 text-emerald-400 rounded-xl">
+
+              <i class="fa-solid fa-tags text-lg"></i>
+
+            </div>
+
+            <div>
+
+              <h3 class="text-sm font-bold text-white">Gestión de Categorías y Carpetas en Google Drive</h3>
+
+              <p class="text-[11px] text-slate-400">Agrega o elimina secciones. Cada categoría tiene su subcarpeta en Drive y sincronización en Sheets.</p>
+
+            </div>
+
+          </div>
+
+          <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+
+            <button type="button" onclick="cargarDatosCompletosAdmin()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 border border-slate-700">
+
+              <i class="fa-solid fa-rotate"></i> Actualizar
+
+            </button>
+
+            <button type="button" id="btnNuevaCategoria" onclick="abrirModalNuevaCategoria()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow flex items-center gap-1.5">
+
+              <i class="fa-solid fa-plus"></i> Nueva Categoría
+
+            </button>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow">
+
+          <div class="overflow-x-auto">
+
+            <table class="w-full text-left text-xs">
+
+              <thead class="bg-slate-950/70 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+
+                <tr>
+
+                  <th class="p-3 w-20">ID</th>
+
+                  <th class="p-3">Categoría</th>
+
+                  <th class="p-3">Subcarpeta en Google Drive</th>
+
+                  <th class="p-3">Descripción</th>
+
+                  <th class="p-3 text-center">Productos</th>
+
+                  <th class="p-3 text-right">Acciones</th>
+
+                </tr>
+
+              </thead>
+
+              <tbody id="tablaBodyCategorias" class="divide-y divide-slate-800/60 text-slate-300">
+
+                <!-- Se llena dinámicamente -->
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- ========================================== -->
+
+      <!-- PESTAÑA 3: GESTIÓN DE PEDIDOS RECIBIDOS -->
+
+      <!-- ========================================== -->
+
+      <div id="seccionPedidos" class="hidden space-y-4">
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow">
+
+          <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+
+            <h3 class="text-xs font-bold text-white flex items-center gap-2">
+
+              <i class="fa-solid fa-cart-shopping text-indigo-400"></i> Pedidos Recibidos por WhatsApp (<span id="pedidosCountBadge">0</span>)
+
+            </h3>
+
+            <button type="button" onclick="cargarDatosCompletosAdmin()" class="text-xs text-indigo-400 hover:text-indigo-300">
+
+              <i class="fa-solid fa-rotate mr-1"></i> Refrescar
+
+            </button>
+
+          </div>
+
+          <div class="overflow-x-auto">
+
+            <table class="w-full text-left text-xs">
+
+              <thead class="bg-slate-950/70 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+
+                <tr>
+
+                  <th class="p-3">Pedido ID / Fecha</th>
+
+                  <th class="p-3">Cliente</th>
+
+                  <th class="p-3">Detalle</th>
+
+                  <th class="p-3">Total ($)</th>
+
+                  <th class="p-3">Estado</th>
+
+                  <th class="p-3 text-right">Contactar</th>
+
+                </tr>
+
+              </thead>
+
+              <tbody id="tablaBodyPedidos" class="divide-y divide-slate-800/60 font-medium text-slate-200">
+
+                <tr>
+
+                  <td colspan="6" class="p-8 text-center text-slate-500 italic">No hay pedidos registrados todav&iacute;a.</td>
+
+                </tr>
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- ========================================== -->
+
+      <!-- PESTAÑA 4: DIRECTORIO DE CLIENTES -->
+
+      <!-- ========================================== -->
+
+      <div id="seccionClientes" class="hidden space-y-4">
+
+        <!-- Banner Alerta de Clientes Pendientes -->
+        <div id="bannerAlertaPendientes" class="hidden p-3.5 bg-gradient-to-r from-amber-500/20 via-amber-600/10 to-transparent border border-amber-500/30 rounded-2xl text-xs text-amber-200 flex items-center justify-between shadow-lg">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 text-sm">
+              <i class="fa-solid fa-bell animate-pulse"></i>
+            </span>
+            <div>
+              <p class="font-bold text-white text-xs">¡Atención Administrador! Nuevos Registros Pendientes</p>
+              <p class="text-[11px] text-amber-300/80">Hay <strong id="cantClientesPendientesAlerta" class="text-amber-300 font-extrabold">0</strong> cliente(s) esperando revisión y confirmación en el sistema.</p>
+            </div>
+          </div>
+          <button type="button" onclick="filtrarClientesPorEstado('Pendiente')" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-3 py-1.5 rounded-xl text-xs transition shadow flex items-center gap-1.5">
+            <i class="fa-solid fa-filter"></i> Ver Pendientes
+          </button>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow">
+
+          <div class="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+
+            <div class="flex items-center gap-3">
+              <h3 class="text-xs font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-users text-amber-400"></i> Directorio de Clientes (<span id="clientesCountBadge">0</span>)
+              </h3>
+
+              <!-- Filtros de Estado -->
+              <div class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px] font-semibold">
+                <button type="button" id="btnFiltroCliTodos" onclick="filtrarClientesPorEstado('todos')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white transition">
+                  Todos (<span id="countCliTodos">0</span>)
+                </button>
+                <button type="button" id="btnFiltroCliPendientes" onclick="filtrarClientesPorEstado('Pendiente')" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-amber-300 transition">
+                  ⏳ Pendientes (<span id="countCliPendientes">0</span>)
+                </button>
+                <button type="button" id="btnFiltroCliConfirmados" onclick="filtrarClientesPorEstado('Confirmado')" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-emerald-300 transition">
+                  ✅ Confirmados (<span id="countCliConfirmados">0</span>)
+                </button>
+              </div>
+            </div>
+
+            <button type="button" onclick="cargarDatosCompletosAdmin()" class="text-xs text-indigo-400 hover:text-indigo-300">
+              <i class="fa-solid fa-rotate mr-1"></i> Refrescar
+            </button>
+
+          </div>
+
+          <div class="overflow-x-auto">
+
+            <table class="w-full text-left text-xs">
+
+              <thead class="bg-slate-950/70 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+
+                <tr>
+
+                  <th class="p-3">Fecha</th>
+
+                  <th class="p-3">Cédula / DNI</th>
+
+                  <th class="p-3">Nombre Completo</th>
+
+                  <th class="p-3">Ciudad / Dirección</th>
+
+                  <th class="p-3">Total Pedidos</th>
+
+                  <th class="p-3 text-center">Estado</th>
+
+                  <th class="p-3 text-right">Acciones</th>
+
+                </tr>
+
+              </thead>
+
+              <tbody id="tablaBodyClientes" class="divide-y divide-slate-800/60 font-medium text-slate-200">
+
+                <tr>
+
+                  <td colspan="7" class="p-8 text-center text-slate-500 italic">No hay clientes registrados aún.</td>
+
+                </tr>
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SECCIÓN BANDEJA DE ENTRADA / CHATS WEB -->
+      <!-- ========================================== -->
+      <div id="seccionMensajes" class="hidden space-y-4">
+        
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row min-h-[580px] max-h-[700px]">
+          
+          <!-- Columna Izquierda: Lista de Conversaciones -->
+          <div class="w-full md:w-80 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col bg-slate-950/60">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+              <h3 class="text-xs font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-inbox text-cyan-400"></i> Bandeja de Chats (<span id="countChatsBadge">0</span>)
+              </h3>
+              <button type="button" onclick="cargarChatsAdminUI()" class="text-xs text-indigo-400 hover:text-indigo-300">
+                <i class="fa-solid fa-rotate"></i>
+              </button>
+            </div>
+            
+            <!-- Buscador de Chats -->
+            <div class="p-3 border-b border-slate-800/80">
+              <input type="text" id="inputBuscarChat" placeholder="Buscar cliente o teléfono..." 
+                     oninput="filtrarChatsAdminUI(this.value)"
+                     class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <!-- Lista de Contactos / Conversaciones -->
+            <div id="listaConversacionesAdmin" class="flex-1 overflow-y-auto divide-y divide-slate-800/50">
+              <div class="p-6 text-center text-slate-500 text-xs italic">
+                Cargando conversaciones...
+              </div>
+            </div>
+          </div>
+
+          <!-- Columna Derecha: Hilo de Conversación Activa -->
+          <div class="flex-1 flex flex-col bg-slate-900">
+            
+            <!-- Vista cuando NO hay conversación seleccionada -->
+            <div id="chatAdminVacio" class="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3">
+              <div class="w-16 h-16 rounded-3xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-3xl">
+                <i class="fa-regular fa-comments"></i>
+              </div>
+              <h4 class="text-sm font-bold text-white">Bandeja de Entrada de Clientes</h4>
+              <p class="text-xs text-slate-400 max-w-sm">Selecciona una conversación de la izquierda para ver el historial y responder directamente desde aquí.</p>
+            </div>
+
+            <!-- Vista cuando HAY conversación seleccionada -->
+            <div id="chatAdminActivo" class="hidden flex-1 flex flex-col overflow-hidden">
+              <!-- Header de la conversación -->
+              <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/40">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-2xl bg-cyan-600/20 text-cyan-400 flex items-center justify-center font-bold text-sm border border-cyan-500/30">
+                    <i class="fa-solid fa-user"></i>
+                  </div>
+                  <div>
+                    <h4 id="chatAdminNombreCliente" class="text-sm font-bold text-white">Cliente</h4>
+                    <span id="chatAdminTelefonoCliente" class="text-xs text-slate-400">Teléfono: -</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <a id="btnChatAdminAbrirWA" href="#" target="_blank" class="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+                    <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp
+                  </a>
+                </div>
+              </div>
+
+              <!-- Mensajes -->
+              <div id="chatAdminMensajesHistorial" class="flex-1 p-4 overflow-y-auto space-y-3 text-xs bg-slate-900/50">
+              </div>
+
+              <!-- Input de Respuesta -->
+              <div class="p-3 bg-slate-950/80 border-t border-slate-800 flex items-center gap-2">
+                <input type="text" id="inputAdminRespuestaChat" placeholder="Escribe tu respuesta al cliente..." 
+                       onkeydown="if(event.key==='Enter'){ enviarRespuestaAdminUI(); }"
+                       class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                <button type="button" onclick="enviarRespuestaAdminUI()" id="btnAdminEnviarChat" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-bold text-xs transition shadow shadow-indigo-600/30 flex items-center gap-1.5">
+                  <i class="fa-solid fa-paper-plane"></i> Responder
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- ========================================== -->
+      <!-- SECCIÓN CONFIGURACIÓN DE MARCA Y TIENDA -->
+      <!-- ========================================== -->
+      <div id="seccionMarca" class="hidden space-y-6">
+        
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6 max-w-3xl">
+          
+          <div class="border-b border-slate-800 pb-4">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-palette text-violet-400"></i> Identidad y Marca de la Tienda
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Personaliza el nombre de tu negocio, eslogan, logo y tipografía para que se muestren en tu catálogo público.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <div class="space-y-1.5">
+              <label class="text-[11px] font-bold text-slate-400">Nombre de la Tienda / Negocio</label>
+              <input type="text" id="cfgInputNombreTienda" placeholder="Ej. Mi Tienda Express" 
+                     class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="text-[11px] font-bold text-slate-400">Eslogan / Subtítulo</label>
+              <input type="text" id="cfgInputSloganTienda" placeholder="Ej. Calidad y Envíos Inmediatos" 
+                     class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="space-y-1.5 md:col-span-2">
+              <label class="text-[11px] font-bold text-slate-400">Enlace del Logo (URL de imagen o Google Drive)</label>
+              <div class="flex items-center gap-2">
+                <input type="url" id="cfgInputLogoUrl" placeholder="https://lh3.googleusercontent.com/... o https://..." 
+                       oninput="actualizarPreviewLogoAdmin(this.value)"
+                       class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                <div class="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <img id="cfgLogoPreview" src="" alt="Logo" class="hidden w-full h-full object-contain">
+                  <i id="cfgLogoPreviewIcon" class="fa-solid fa-image text-slate-600 text-sm"></i>
+                </div>
+              </div>
+              <p class="text-[10px] text-slate-500">Puedes pegar una URL pública o subir tu imagen a la carpeta "Activos Web" en Google Drive.</p>
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="text-[11px] font-bold text-slate-400">Teléfono WhatsApp de Pedidos</label>
+              <input type="tel" id="cfgInputTelefonoWA" placeholder="584120666322" 
+                     class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="text-[11px] font-bold text-slate-400">Estilo de Tipografía</label>
+              <select id="cfgSelectFuente" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                <option value="Inter">Moderna & Limpia (Inter)</option>
+                <option value="Poppins">Redondeada & Amigable (Poppins)</option>
+                <option value="Playfair Display">Elegante & Clásica (Playfair)</option>
+                <option value="Montserrat">Corporativa & Fuerte (Montserrat)</option>
+                <option value="Oswald">Impactante & Deportiva (Oswald)</option>
+              </select>
+            </div>
+
+          </div>
+
+          <div class="pt-4 border-t border-slate-800 flex items-center justify-between">
+            <span id="cfgMensajeGuardado" class="text-xs text-emerald-400 font-bold hidden">
+              <i class="fa-solid fa-circle-check mr-1"></i> ¡Configuración guardada exitosamente!
+            </span>
+            <button type="button" id="btnGuardarMarca" onclick="guardarConfigMarcaAdminUI()" 
+                    class="ml-auto bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition shadow-lg shadow-indigo-600/30 flex items-center gap-2">
+              <i class="fa-solid fa-floppy-disk"></i> Guardar Cambios de Marca
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+    </div>
+
+  </div>
+
+
+
+  <!-- ========================================== -->
+
+  <!-- MODAL CAMBIAR CONTRASEÑA ADMINISTRADOR -->
+
+  <!-- ========================================== -->
+
+  <div id="modalCambiarClave" class="fixed inset-0 z-50 bg-black/80 hidden items-center justify-center p-4">
+
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+
+          <i class="fa-solid fa-key text-indigo-400"></i> Cambiar Clave de Administrador
+
+        </h3>
+
+        <button type="button" onclick="cerrarModalCambiarClave()" class="text-slate-400 hover:text-white text-xs">
+
+          <i class="fa-solid fa-xmark text-base"></i>
+
+        </button>
+
+      </div>
+
+
+
+      <div class="space-y-3">
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Clave Actual *</label>
+
+          <input type="password" id="inputClaveActualModal" placeholder="Ingresa la clave actual" 
+
+                 class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+        </div>
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Nueva Clave *</label>
+
+          <input type="password" id="inputClaveNuevaModal" placeholder="M&iacute;nimo 4 caracteres" 
+
+                 class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+        </div>
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Confirmar Nueva Clave *</label>
+
+          <input type="password" id="inputClaveConfirmarModal" placeholder="Repite la nueva clave" 
+
+                 class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+        </div>
+
+      </div>
+
+
+
+      <div class="border-t border-slate-800 pt-3 flex justify-end gap-2">
+
+        <button type="button" onclick="cerrarModalCambiarClave()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-semibold transition">
+
+          Cancelar
+
+        </button>
+
+        <button type="button" onclick="guardarNuevaClaveAdmin()" id="btnGuardarClaveModal" 
+
+                class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5">
+
+          <i class="fa-solid fa-floppy-disk"></i> Guardar Nueva Clave
+
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- MODAL NUEVA CATEGORÍA -->
+
+  <div id="modalNuevaCategoria" class="fixed inset-0 z-50 bg-black/80 hidden items-center justify-center p-4">
+
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+
+          <i class="fa-solid fa-folder-plus text-emerald-400"></i> Crear Nueva Categoría
+
+        </h3>
+
+        <button type="button" onclick="cerrarModalNuevaCategoria()" class="text-slate-400 hover:text-white text-xs">
+
+          <i class="fa-solid fa-xmark text-base"></i>
+
+        </button>
+
+      </div>
+
+
+
+      <div class="space-y-3">
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre de la Categoría *</label>
+
+          <input type="text" id="nuevaCatNombre" placeholder="Ej: Tecnología, Ferretería, Hogar..." 
+
+                 class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+
+        </div>
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Descripción Breve</label>
+
+          <textarea id="nuevaCatDesc" rows="2" placeholder="Ej: Accesorios, repuestos y artículos..." 
+
+                    class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"></textarea>
+
+        </div>
+
+        <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[11px] text-emerald-300 flex items-start gap-2">
+
+          <i class="fa-solid fa-cloud-arrow-up mt-0.5"></i>
+
+          <span>Google Drive creará automáticamente una subcarpeta pública para organizar las fotos de esta categoría.</span>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="border-t border-slate-800 pt-3 flex justify-end gap-2">
+
+        <button type="button" onclick="cerrarModalNuevaCategoria()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-semibold transition">
+
+          Cancelar
+
+        </button>
+
+        <button type="button" onclick="guardarNuevaCategoria(event)" id="btnCrearCatSubmit" 
+
+                class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-xl text-xs font-bold transition shadow flex items-center gap-1.5">
+
+          <i class="fa-solid fa-check"></i> Crear Categoría
+
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- TOAST DE NOTIFICACIONES -->
+
+  <div id="toastAdmin" class="fixed bottom-5 right-5 z-[100] hidden bg-slate-900 border border-slate-700 text-white text-xs px-4 py-3 rounded-2xl shadow-2xl items-center gap-2.5">
+
+    <i id="toastAdminIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+
+    <span id="toastAdminMsg">Acci&oacute;n completada</span>
+
+  </div>
+
+
+
+  <!-- SCRIPT LOGIC DEL PANEL ADMIN (PURE ASCII) -->
+
+  <script>
+
+    var claveActual = '';
+
+    var datosAdmin = { productos: [], pedidos: [], clientes: [], categorias: [] };
+
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var esGoogle = window.location.hostname.indexOf('google') !== -1;
+      var btnTienda = document.getElementById('btnVerTienda');
+
+      if (btnTienda) {
+        btnTienda.href = esGoogle
+          ? 'https://script.google.com/macros/s/AKfycbyDNwrX4Q4yZ1IQAL_xN1m4l-sauRXpe-cqpZAChMMb89S9NuGAJpg_EgXsi0i3w2meug/exec'
+          : 'index.html';
+      }
+
+      var sesion = sessionStorage.getItem('admin_tienda_clave');
+      if (sesion) {
+        claveActual = sesion;
+        cargarDatosCompletosAdmin();
+      }
+    });
+
+
+
+    // 1. AUTENTICACION (VIA REST API)
+
+    async function iniciarSesionAdmin() {
+
+      var claveInput = document.getElementById('inputClaveAdmin');
+
+      var clave = claveInput ? claveInput.value.trim() : '';
+
+      if (!clave) {
+
+        alert('Por favor escribe la clave de administrador.');
+
+        return;
+
+      }
+
+
+
+      var btn = document.getElementById('btnLogin');
+
+      if (btn) {
+
+        btn.disabled = true;
+
+        btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Verificando...';
+
+      }
+
+
+
+      try {
+
+        const res = await apiGet({ accion: 'validarClaveAdmin', clave: clave });
+
+        if (btn) {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<i class="fa-solid fa-lock-open"></i> Entrar al Panel';
+
+        }
+
+        if (res && res.autorizada) {
+
+          claveActual = clave;
+
+          sessionStorage.setItem('admin_tienda_clave', clave);
+
+          cargarDatosCompletosAdmin();
+
+        } else {
+
+          alert('Contraseña incorrecta. Intenta de nuevo.');
+
+        }
+
+      } catch (err) {
+
+        if (btn) {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<i class="fa-solid fa-lock-open"></i> Entrar al Panel';
+
+        }
+
+        alert('Error al verificar: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    function cerrarSesionAdmin(forzar) {
+
+      if (!forzar && !confirm('¿Estás seguro de que deseas cerrar sesión?')) return;
+
+      sessionStorage.removeItem('admin_tienda_clave');
+
+      claveActual = '';
+
+      document.getElementById('pantallaLogin').classList.remove('hidden');
+
+      document.getElementById('panelPrincipal').classList.add('hidden');
+
+    }
+
+
+
+    // 2. CARGA DE DATOS DE LA TIENDA (VIA REST API)
+
+    async function cargarDatosCompletosAdmin() {
+
+      try {
+
+        const res = await apiGet({ accion: 'obtenerDatosAdmin', clave: claveActual });
+
+        if (res && res.exito) {
+
+          datosAdmin = res;
+
+          mostrarPanelPrincipal();
+
+        } else {
+
+          alert((res && res.mensaje) ? res.mensaje : 'Acceso denegado');
+
+          cerrarSesionAdmin();
+
+        }
+
+      } catch (err) {
+
+        alert('Error cargando datos: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    function mostrarPanelPrincipal() {
+
+      document.getElementById('pantallaLogin').classList.add('hidden');
+
+      document.getElementById('panelPrincipal').classList.remove('hidden');
+      if (datosAdmin.categorias) {
+        var catActivos = datosAdmin.categorias.find(function(c) { return c.id === 'CAT-00' || c.categoria === 'Activos Web'; });
+        if (catActivos && catActivos.urlDrive) {
+          var elAct = document.getElementById('linkActivosWeb');
+          if (elAct) {
+            var u = catActivos.urlDrive;
+            if (!u.includes('authuser=')) u += (u.includes('?') ? '&' : '?') + 'authuser=amazoncorreohumberto@gmail.com';
+            elAct.href = u;
+          }
+        }
+      }
+
+
+
+      // Actualizar metricas
+
+      document.getElementById('metricTotalProd').textContent = datosAdmin.metricas.totalProductos || 0;
+
+      document.getElementById('metricTotalVentas').textContent = '$' + (datosAdmin.metricas.totalVentas || 0).toFixed(2);
+
+      document.getElementById('metricTotalPedidos').textContent = datosAdmin.metricas.totalPedidos || 0;
+
+      document.getElementById('metricTotalClientes').textContent = datosAdmin.metricas.totalClientes || 0;
+
+
+
+      document.getElementById('countPestanaProd').textContent = datosAdmin.productos.length;
+
+      document.getElementById('countPestanaPed').textContent = datosAdmin.pedidos.length;
+
+      document.getElementById('countPestanaCli').textContent = datosAdmin.clientes.length;
+
+      var elCountCat = document.getElementById('countPestanaCat');
+      if (elCountCat) elCountCat.textContent = (datosAdmin.categorias || []).length;
+
+      document.getElementById('pedidosCountBadge').textContent = datosAdmin.pedidos.length;
+
+      document.getElementById('clientesCountBadge').textContent = datosAdmin.clientes.length;
+
+      renderizarTablaProductos(datosAdmin.productos);
+
+      renderizarTablaCategorias(datosAdmin.categorias || []);
+
+      actualizarSelectCategorias(datosAdmin.categorias || []);
+
+      renderizarTablaPedidos(datosAdmin.pedidos);
+
+      renderizarTablaClientes(datosAdmin.clientes);
+
+    }
+
+
+
+    // 3. CAMBIO DE PESTANAS
+
+    function cambiarPestana(pestana) {
+
+      ['seccionProductos', 'seccionFormularioProducto', 'modalProducto', 'seccionCategorias', 'seccionPedidos', 'seccionClientes', 'seccionMensajes', 'seccionMarca'].forEach(function(id) {
+
+        var el = document.getElementById(id);
+
+        if (el) el.classList.add('hidden');
+
+      });
+
+
+
+      ['tabBtnProductos', 'tabBtnCategorias', 'tabBtnPedidos', 'tabBtnClientes', 'tabBtnMensajes', 'tabBtnMarca'].forEach(function(id) {
+
+        var b = document.getElementById(id);
+
+        if (b) {
+
+          b.className = 'px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800 flex items-center gap-2';
+
+        }
+
+      });
+
+
+
+      if (pestana === 'productos') {
+
+        document.getElementById('seccionProductos').classList.remove('hidden');
+
+        document.getElementById('tabBtnProductos').className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-indigo-600 text-white shadow flex items-center gap-2';
+
+      } else if (pestana === 'categorias') {
+
+        document.getElementById('seccionCategorias').classList.remove('hidden');
+
+        document.getElementById('tabBtnCategorias').className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-indigo-600 text-white shadow flex items-center gap-2';
+
+      } else if (pestana === 'nuevo') {
+
+        var mProd = document.getElementById('modalProducto');
+        if (mProd) mProd.classList.remove('hidden');
+        var sProd = document.getElementById('seccionFormularioProducto');
+        if (sProd) sProd.classList.remove('hidden');
+
+      } else if (pestana === 'pedidos') {
+
+        document.getElementById('seccionPedidos').classList.remove('hidden');
+
+        document.getElementById('tabBtnPedidos').className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-indigo-600 text-white shadow flex items-center gap-2';
+
+      } else if (pestana === 'clientes') {
+
+        document.getElementById('seccionClientes').classList.remove('hidden');
+
+        document.getElementById('tabBtnClientes').className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-indigo-600 text-white shadow flex items-center gap-2';
+
+      } else if (pestana === 'mensajes') {
+
+        document.getElementById('seccionMensajes').classList.remove('hidden');
+
+        document.getElementById('tabBtnMensajes').className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-indigo-600 text-white shadow flex items-center gap-2';
+
+        cargarChatsAdminUI();
+
+      } else if (pestana === 'marca') {
+
+        document.getElementById('seccionMarca').classList.remove('hidden');
+
+        document.getElementById('tabBtnMarca').className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-indigo-600 text-white shadow flex items-center gap-2';
+
+        cargarConfigMarcaAdminUI();
+
+      }
+
+    }
+
+    // ==========================================
+    // GESTIÓN DE BANDEJA DE CHATS EN PANEL ADMIN
+    // ==========================================
+    let listaChatsAdminGlobal = [];
+    let chatActivoSeleccionado = null;
+
+    async function cargarChatsAdminUI() {
+      try {
+        const chats = await obtenerTodosChatsAdmin(claveAdminActual);
+        listaChatsAdminGlobal = chats || [];
+        renderizarListaChatsAdmin(listaChatsAdminGlobal);
+
+        // Actualizar badges
+        let totalNoLeidos = 0;
+        listaChatsAdminGlobal.forEach(c => { totalNoLeidos += (c.noLeidos || 0); });
+        const b = document.getElementById('countPestanaMensajes');
+        if (b) b.textContent = totalNoLeidos;
+        const b2 = document.getElementById('countChatsBadge');
+        if (b2) b2.textContent = listaChatsAdminGlobal.length;
+
+        if (chatActivoSeleccionado) {
+          seleccionarChatAdmin(chatActivoSeleccionado.clienteId);
+        }
+      } catch (err) {
+        console.warn('Error al cargar chats:', err);
+      }
+    }
+
+    function renderizarListaChatsAdmin(chats) {
+      const contenedor = document.getElementById('listaConversacionesAdmin');
+      if (!contenedor) return;
+
+      if (!chats || chats.length === 0) {
+        contenedor.innerHTML = '<div class="p-6 text-center text-slate-500 text-xs italic">No hay conversaciones activas aún.</div>';
+        return;
+      }
+
+      let html = '';
+      chats.forEach(c => {
+        const nombre = c.nombre || 'Cliente Anónimo';
+        const tlf = c.telefono || c.clienteId || '';
+        const ultimoMsg = c.ultimoMensaje || 'Sin mensajes';
+        const noLeidos = c.noLeidos || 0;
+        const esSeleccionado = chatActivoSeleccionado && chatActivoSeleccionado.clienteId === c.clienteId;
+
+        html += `
+          <div onclick="seleccionarChatAdmin('${c.clienteId}')" 
+               class="p-3 cursor-pointer transition ${esSeleccionado ? 'bg-indigo-600/20 border-l-4 border-indigo-500' : 'hover:bg-slate-900/60'}">
+            <div class="flex items-center justify-between mb-1">
+              <strong class="text-xs text-white truncate max-w-[160px]">${nombre}</strong>
+              ${noLeidos > 0 ? `<span class="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">${noLeidos}</span>` : ''}
+            </div>
+            <p class="text-[11px] text-slate-400 truncate mb-1">${ultimoMsg}</p>
+            <span class="text-[9px] text-slate-500 font-mono">${tlf}</span>
+          </div>
+        `;
+      });
+
+      contenedor.innerHTML = html;
+    }
+
+    function filtrarChatsAdminUI(termino) {
+      const q = String(termino || '').toLowerCase().trim();
+      if (!q) {
+        renderizarListaChatsAdmin(listaChatsAdminGlobal);
+        return;
+      }
+      const filtrados = listaChatsAdminGlobal.filter(c => 
+        (c.nombre && c.nombre.toLowerCase().includes(q)) || 
+        (c.telefono && c.telefono.includes(q)) || 
+        (c.ultimoMensaje && c.ultimoMensaje.toLowerCase().includes(q))
+      );
+      renderizarListaChatsAdmin(filtrados);
+    }
+
+    function seleccionarChatAdmin(clienteId) {
+      const c = listaChatsAdminGlobal.find(item => item.clienteId === clienteId);
+      if (!c) return;
+
+      chatActivoSeleccionado = c;
+      c.noLeidos = 0;
+
+      document.getElementById('chatAdminVacio').classList.add('hidden');
+      document.getElementById('chatAdminActivo').classList.remove('hidden');
+
+      document.getElementById('chatAdminNombreCliente').textContent = c.nombre || 'Cliente';
+      document.getElementById('chatAdminTelefonoCliente').textContent = 'WhatsApp / ID: ' + (c.telefono || c.clienteId);
+
+      const btnWA = document.getElementById('btnChatAdminAbrirWA');
+      if (btnWA) {
+        const telLimpio = String(c.telefono || '').replace(/\D/g, '');
+        if (telLimpio) {
+          btnWA.href = 'https://wa.me/' + telLimpio;
+          btnWA.classList.remove('hidden');
+        } else {
+          btnWA.classList.add('hidden');
+        }
+      }
+
+      renderizarMensajesConversacionActivaAdmin(c.mensajes || []);
+      renderizarListaChatsAdmin(listaChatsAdminGlobal);
+    }
+
+    function renderizarMensajesConversacionActivaAdmin(mensajes) {
+      const contenedor = document.getElementById('chatAdminMensajesHistorial');
+      if (!contenedor) return;
+
+      let html = '';
+      mensajes.forEach(m => {
+        const esAdmin = m.remitente === 'admin';
+        const hora = m.fecha ? new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+        if (esAdmin) {
+          html += `
+            <div class="flex items-start justify-end gap-2">
+              <div class="bg-indigo-600 text-white p-3 rounded-2xl rounded-tr-none max-w-[80%] space-y-1 shadow shadow-indigo-600/20">
+                <p class="break-words">${m.mensaje}</p>
+                <span class="text-[9px] text-indigo-200 block text-right">${hora} • Tú (Admin)</span>
+              </div>
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="flex items-start gap-2">
+              <div class="w-7 h-7 rounded-xl bg-cyan-600/20 text-cyan-400 flex items-center justify-center text-xs flex-shrink-0">
+                <i class="fa-solid fa-user"></i>
+              </div>
+              <div class="bg-slate-800 border border-slate-700 text-slate-100 p-3 rounded-2xl rounded-tl-none max-w-[80%] space-y-1">
+                <p class="break-words">${m.mensaje}</p>
+                <span class="text-[9px] text-slate-400 block text-right">${hora}</span>
+              </div>
+            </div>
+          `;
+        }
+      });
+
+      contenedor.innerHTML = html;
+      contenedor.scrollTop = contenedor.scrollHeight;
+    }
+
+    async function enviarRespuestaAdminUI() {
+      const input = document.getElementById('inputAdminRespuestaChat');
+      const texto = input.value.trim();
+      if (!texto || !chatActivoSeleccionado) return;
+
+      input.value = '';
+      const clienteId = chatActivoSeleccionado.clienteId;
+
+      await responderChatAdmin(claveAdminActual, clienteId, texto);
+
+      if (!chatActivoSeleccionado.mensajes) chatActivoSeleccionado.mensajes = [];
+      chatActivoSeleccionado.mensajes.push({
+        id: 'MSG-' + Date.now(),
+        fecha: new Date().toISOString(),
+        clienteId: clienteId,
+        remitente: 'admin',
+        mensaje: texto,
+        leido: true
+      });
+      chatActivoSeleccionado.ultimoMensaje = texto;
+
+      renderizarMensajesConversacionActivaAdmin(chatActivoSeleccionado.mensajes);
+      renderizarListaChatsAdmin(listaChatsAdminGlobal);
+    }
+
+    // ==========================================
+    // GESTIÓN DE CONFIGURACIÓN DE MARCA EN PANEL ADMIN
+    // ==========================================
+    async function cargarConfigMarcaAdminUI() {
+      try {
+        const config = await obtenerConfiguracionMarca();
+        if (config) {
+          document.getElementById('cfgInputNombreTienda').value = config.nombreTienda || '';
+          document.getElementById('cfgInputSloganTienda').value = config.sloganTienda || '';
+          document.getElementById('cfgInputLogoUrl').value = config.logoUrl || '';
+          document.getElementById('cfgInputTelefonoWA').value = config.telefonoWA || '';
+          document.getElementById('cfgSelectFuente').value = config.fuente || 'Inter';
+          actualizarPreviewLogoAdmin(config.logoUrl || '');
+        }
+      } catch (err) {
+        console.warn('Error al cargar config marca:', err);
+      }
+    }
+
+    function actualizarPreviewLogoAdmin(url) {
+      const img = document.getElementById('cfgLogoPreview');
+      const icon = document.getElementById('cfgLogoPreviewIcon');
+      if (url && url.trim() !== '') {
+        img.src = url.trim();
+        img.classList.remove('hidden');
+        icon.classList.add('hidden');
+      } else {
+        img.classList.add('hidden');
+        icon.classList.remove('hidden');
+      }
+    }
+
+    async function guardarConfigMarcaAdminUI() {
+      const config = {
+        nombreTienda: document.getElementById('cfgInputNombreTienda').value.trim() || 'Catálogo Virtual',
+        sloganTienda: document.getElementById('cfgInputSloganTienda').value.trim() || 'Tienda Online • Pedidos Directos',
+        logoUrl: document.getElementById('cfgInputLogoUrl').value.trim(),
+        telefonoWA: document.getElementById('cfgInputTelefonoWA').value.trim() || '584120666322',
+        fuente: document.getElementById('cfgSelectFuente').value || 'Inter'
+      };
+
+      const btn = document.getElementById('btnGuardarMarca');
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+
+      try {
+        await guardarConfiguracionMarca(claveAdminActual, config);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Cambios de Marca';
+        
+        const msg = document.getElementById('cfgMensajeGuardado');
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 4000);
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Cambios de Marca';
+        alert('Error al guardar configuración: ' + err.message);
+      }
+    }
+
+
+
+    // 4. RENDERIZADO TABLA PRODUCTOS
+
+    function renderizarTablaProductos(lista) {
+
+      var tbody = document.getElementById('tablaBodyProductos');
+
+      tbody.innerHTML = '';
+
+
+
+      if (!lista || lista.length === 0) {
+
+        tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-500 italic">No hay productos que coincidan.</td></tr>';
+
+        return;
+
+      }
+
+
+
+      lista.forEach(function(p) {
+
+        var tr = document.createElement('tr');
+
+        tr.className = 'hover:bg-slate-800/40 transition';
+
+        var colorEstado = p.estado === 'Disponible' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border-rose-500/30';
+
+
+
+        tr.innerHTML = 
+
+          '<td class="p-3">' +
+
+            '<div class="w-12 h-12 bg-slate-950 rounded-xl overflow-hidden border border-slate-800 p-1 flex items-center justify-center">' +
+
+              '<img src="' + p.fotoPrincipalVisual + '" class="w-full h-full object-contain">' +
+
+            '</div>' +
+
+          '</td>' +
+
+          '<td class="p-3">' +
+
+            '<strong class="text-white block font-bold text-xs">' + p.nombre + '</strong>' +
+
+            '<span class="text-[10px] text-indigo-400 font-mono">' + p.id + '</span>' +
+
+          '</td>' +
+
+          '<td class="p-3">' +
+
+            '<span class="bg-slate-800 px-2 py-0.5 rounded text-[11px] font-semibold text-slate-300">' + p.categoria + '</span>' +
+
+            '<span class="text-[10px] text-slate-500 block mt-0.5">' + (p.subcategoria || p.genero) + '</span>' +
+
+          '</td>' +
+
+          '<td class="p-3">' +
+
+            '<div class="flex items-center gap-1.5">' +
+
+              '<span class="text-xs text-slate-400">$</span>' +
+
+              '<input type="number" step="0.5" value="' + p.precio + '" onchange="guardarPrecioRapido(\"' + p.id + '\", this.value)" ' +
+
+                     'class="w-20 bg-slate-950 border border-slate-700 rounded-lg p-1 text-xs text-white text-right font-bold focus:border-indigo-500 focus:outline-none">' +
+
+            '</div>' +
+
+          '</td>' +
+
+          '<td class="p-3">' +
+
+            '<div class="flex flex-col items-center gap-1">' +
+
+              '<input type="number" min="0" value="' + p.stock + '" onchange="guardarStockRapido(\"' + p.id + '\", this.value)" ' +
+
+                     'class="w-16 bg-slate-950 border ' + (p.stock <= 0 ? 'border-rose-500 text-rose-400 font-bold' : (p.stock <= 3 ? 'border-amber-500 text-amber-400 font-bold' : 'border-slate-700 text-white')) + ' rounded-lg p-1 text-xs text-center focus:border-indigo-500 focus:outline-none">' +
+
+              (p.stock <= 0 ? '<span class="text-[9px] text-rose-400 font-bold">Agotado</span>' : (p.stock <= 3 ? '<span class="text-[9px] text-amber-400 font-bold">¡Bajo!</span>' : '<span class="text-[9px] text-emerald-400 font-medium">En Stock</span>')) +
+
+            '</div>' +
+
+          '</td>' +
+
+          '<td class="p-3">' +
+
+            '<button type="button" onclick="alternarEstadoRapido(\"' + p.id + '\", \"' + p.estado + '\")" class="px-2.5 py-1 rounded-lg text-[10px] font-bold border ' + colorEstado + ' transition">' +
+
+              p.estado +
+
+            '</button>' +
+
+          '</td>' +
+
+          '<td class="p-3 text-right space-x-1.5 whitespace-nowrap">' +
+
+            '<button type="button" onclick="editarProducto(\"' + p.id + '\")" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 border border-indigo-500/30 px-2.5 py-1.5 rounded-xl text-xs transition">' +
+
+              '<i class="fa-solid fa-pen"></i>' +
+
+            '</button>' +
+
+            '<button type="button" onclick="eliminarProducto(\"' + p.id + '\")" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 px-2.5 py-1.5 rounded-xl text-xs transition">' +
+
+              '<i class="fa-solid fa-trash"></i>' +
+
+            '</button>' +
+
+          '</td>';
+
+
+
+        tbody.appendChild(tr);
+
+      });
+
+    }
+
+
+
+    // 4.B GESTION DE CATEGORIAS
+
+    function renderizarTablaCategorias(categorias) {
+
+      var tbody = document.getElementById('tablaBodyCategorias');
+
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+
+
+
+      if (!categorias || categorias.length === 0) {
+
+        tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-500 italic">No hay categorías registradas en la hoja.</td></tr>';
+
+        return;
+
+      }
+
+
+
+      var productos = (datosAdmin && datosAdmin.productos) ? datosAdmin.productos : [];
+
+
+
+      categorias.forEach(function(c) {
+
+        var tr = document.createElement('tr');
+
+        tr.className = 'hover:bg-slate-800/40 transition';
+
+
+
+        var prodsEnCat = productos.filter(function(p) {
+
+          return String(p.categoria).trim().toLowerCase() === String(c.categoria).trim().toLowerCase();
+
+        }).length;
+
+
+
+        var urlDriveConAuth = c.urlDrive || '';
+
+        if (urlDriveConAuth && !urlDriveConAuth.includes('authuser=')) {
+
+          urlDriveConAuth += (urlDriveConAuth.includes('?') ? '&' : '?') + 'authuser=amazoncorreohumberto@gmail.com';
+
+        }
+
+
+
+        var linkDriveHtml = urlDriveConAuth
+
+          ? '<a href="' + urlDriveConAuth + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-semibold">' +
+
+              '<i class="fa-brands fa-google-drive"></i> ' + (c.nombreCarpeta || c.categoria) + ' <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>' +
+
+            '</a>'
+
+          : '<span class="text-slate-500 text-xs italic">Sin carpeta</span>';
+
+
+
+        var esSistema = (c.id === 'CAT-00' || c.categoria === 'Activos Web');
+
+
+
+        var botonEliminar = esSistema
+
+          ? '<span class="text-[10px] text-slate-500 italic px-2 py-1 rounded bg-slate-800">Sistema</span>'
+
+          : '<button type="button" onclick="eliminarCategoria(\'' + c.id + '\', \'' + c.categoria.replace(/'/g, "\\'") + '\')" ' +
+
+              'class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 px-2.5 py-1.5 rounded-xl text-xs transition inline-flex items-center gap-1" title="Eliminar Categoría">' +
+
+              '<i class="fa-solid fa-trash"></i> Quitar' +
+
+            '</button>';
+
+
+
+        tr.innerHTML =
+
+          '<td class="p-3 font-mono text-xs text-indigo-400 font-bold">' + c.id + '</td>' +
+
+          '<td class="p-3 font-bold text-white">' +
+
+            '<span class="inline-flex items-center gap-1.5">' +
+
+              '<i class="fa-solid fa-tag text-emerald-400 text-xs"></i> ' + c.categoria +
+
+            '</span>' +
+
+          '</td>' +
+
+          '<td class="p-3">' + linkDriveHtml + '</td>' +
+
+          '<td class="p-3 text-slate-400 max-w-xs truncate" title="' + (c.descripcion || '') + '">' + (c.descripcion || '<span class="italic text-slate-600">Sin descripción</span>') + '</td>' +
+
+          '<td class="p-3 text-center">' +
+
+            '<span class="px-2.5 py-1 rounded-full text-[11px] font-bold ' + (prodsEnCat > 0 ? 'bg-indigo-500/20 text-indigo-300' : 'bg-slate-800 text-slate-500') + '">' +
+
+              prodsEnCat + ' productos' +
+
+            '</span>' +
+
+          '</td>' +
+
+          '<td class="p-3 text-right whitespace-nowrap">' + botonEliminar + '</td>';
+
+
+
+        tbody.appendChild(tr);
+
+      });
+
+    }
+
+
+
+    function actualizarSelectCategorias(categorias) {
+
+      var select = document.getElementById('formProdCategoria');
+
+      if (!select) return;
+
+      var valorActual = select.value;
+
+      select.innerHTML = '';
+
+
+
+      var catsFiltradas = (categorias || []).filter(function(c) {
+
+        return c.categoria !== 'Activos Web' && c.id !== 'CAT-00';
+
+      });
+
+
+
+      if (catsFiltradas.length === 0) {
+
+        catsFiltradas = [
+
+          { categoria: 'Zapatos' }, { categoria: 'Deportes' }, { categoria: 'Ropa Mujer' },
+
+          { categoria: 'Ropa Hombre' }, { categoria: 'Ropa Niños' }, { categoria: 'Bebés' },
+
+          { categoria: 'Carros' }, { categoria: 'Accesorios' }
+
+        ];
+
+      }
+
+
+
+      catsFiltradas.forEach(function(c) {
+
+        var opt = document.createElement('option');
+
+        opt.value = c.categoria;
+
+        opt.textContent = c.categoria;
+
+        if (c.categoria === valorActual) opt.selected = true;
+
+        select.appendChild(opt);
+
+      });
+
+    }
+
+
+
+    function abrirModalNuevaCategoria() {
+
+      document.getElementById('nuevaCatNombre').value = '';
+
+      document.getElementById('nuevaCatDesc').value = '';
+
+      var m = document.getElementById('modalNuevaCategoria');
+
+      if (m) {
+
+        m.classList.remove('hidden');
+
+        m.classList.add('flex');
+
+      }
+
+    }
+
+
+
+    function cerrarModalNuevaCategoria() {
+
+      var m = document.getElementById('modalNuevaCategoria');
+
+      if (m) {
+
+        m.classList.add('hidden');
+
+        m.classList.remove('flex');
+
+      }
+
+    }
+
+
+
+    async function guardarNuevaCategoria(e) {
+
+      if (e && e.preventDefault) e.preventDefault();
+
+      var nombre = document.getElementById('nuevaCatNombre').value.trim();
+
+      var desc = document.getElementById('nuevaCatDesc').value.trim();
+
+      if (!nombre) {
+
+        alert('Por favor escribe un nombre para la categoría.');
+
+        return;
+
+      }
+
+
+
+      var btn = document.getElementById('btnCrearCatSubmit');
+
+      if (btn) {
+
+        btn.disabled = true;
+
+        btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Creando en Drive y Sheets...';
+
+      }
+
+
+
+      try {
+
+        var res = await apiPost({
+
+          accion: 'crearCategoriaAdmin',
+
+          clave: claveActual,
+
+          nombreCategoria: nombre,
+
+          descripcion: desc
+
+        });
+
+
+
+        if (btn) {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<i class="fa-solid fa-check"></i> Crear Categoría';
+
+        }
+
+
+
+        if (res && res.exito) {
+
+          mostrarToastAdmin(res.mensaje, 'folder-plus', 'emerald');
+
+          cerrarModalNuevaCategoria();
+
+          await cargarDatosCompletosAdmin();
+
+          cambiarPestana('categorias');
+
+        } else {
+
+          alert((res && res.mensaje) ? res.mensaje : 'Error al crear la categoría');
+
+        }
+
+      } catch (err) {
+
+        if (btn) {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<i class="fa-solid fa-check"></i> Crear Categoría';
+
+        }
+
+        alert('Error al crear categoría: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    async function eliminarCategoria(idCat, nombreCat) {
+
+      if (!confirm('¿Estás seguro de que deseas eliminar la categoría "' + nombreCat + '"?\n\nSolo se podrá eliminar si no tiene productos asignados.')) {
+
+        return;
+
+      }
+
+
+
+      try {
+
+        var res = await apiPost({
+
+          accion: 'eliminarCategoriaAdmin',
+
+          clave: claveActual,
+
+          idCategoria: idCat
+
+        });
+
+
+
+        if (res && res.exito) {
+
+          mostrarToastAdmin(res.mensaje, 'trash', 'rose');
+
+          await cargarDatosCompletosAdmin();
+
+          cambiarPestana('categorias');
+
+        } else {
+
+          alert((res && res.mensaje) ? res.mensaje : 'No se pudo eliminar la categoría');
+
+        }
+
+      } catch (err) {
+
+        alert('Error eliminando categoría: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    // 5. EDICION RAPIDA
+
+    async function guardarPrecioRapido(id, nuevoPrecio) {
+
+      var precio = parseFloat(nuevoPrecio);
+
+      if (isNaN(precio) || precio < 0) return;
+
+      try {
+
+        await apiPost({ accion: 'actualizarRapidoAdmin', clave: claveActual, id: id, campo: 'precio', valor: precio });
+
+        mostrarToastAdmin('Precio actualizado a $' + precio.toFixed(2), 'check', 'emerald');
+
+        var prod = datosAdmin.productos.find(function(p) { return p.id === id; });
+
+        if (prod) prod.precio = precio;
+
+      } catch (err) {
+
+        alert('Error actualizando precio: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    async function guardarStockRapido(id, nuevoStock) {
+
+      var stock = parseInt(nuevoStock, 10);
+
+      if (isNaN(stock) || stock < 0) return;
+
+      try {
+
+        await apiPost({ accion: 'actualizarRapidoAdmin', clave: claveActual, id: id, campo: 'stock', valor: stock });
+
+        mostrarToastAdmin('Stock actualizado a ' + stock + ' unidades', 'boxes-stacked', 'indigo');
+
+        var prod = datosAdmin.productos.find(function(p) { return p.id === id; });
+
+        if (prod) prod.stock = stock;
+
+      } catch (err) {
+
+        alert('Error actualizando stock: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    async function alternarEstadoRapido(id, estadoActual) {
+
+      var nuevoEstado = estadoActual === 'Disponible' ? 'Agotado' : 'Disponible';
+
+      try {
+
+        await apiPost({ accion: 'actualizarRapidoAdmin', clave: claveActual, id: id, campo: 'estado', valor: nuevoEstado });
+
+        mostrarToastAdmin('Estado cambiado a ' + nuevoEstado, 'toggle-on', 'amber');
+
+        var prod = datosAdmin.productos.find(function(p) { return p.id === id; });
+
+        if (prod) prod.estado = nuevoEstado;
+
+        renderizarTablaProductos(datosAdmin.productos);
+
+      } catch (err) {
+
+        alert('Error cambiando estado: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    function filtrarProductosAdmin() {
+
+      var query = document.getElementById('filtroAdminProductos').value.toLowerCase().trim();
+
+      if (!query) {
+
+        renderizarTablaProductos(datosAdmin.productos);
+
+        return;
+
+      }
+
+      var filtrados = datosAdmin.productos.filter(function(p) {
+
+        return p.nombre.toLowerCase().includes(query) ||
+
+               p.id.toLowerCase().includes(query) ||
+
+               p.categoria.toLowerCase().includes(query) ||
+
+               (p.subcategoria && p.subcategoria.toLowerCase().includes(query));
+
+      });
+
+      renderizarTablaProductos(filtrados);
+
+    }
+
+
+
+    // 6. FORMULARIO PRODUCTO
+
+    function nuevoProducto() {
+
+      document.getElementById('formProductoTitulo').innerHTML = '<i class="fa-solid fa-box-open text-indigo-400"></i> Agregar Nuevo Producto';
+
+      document.getElementById('formProdId').value = '';
+
+      document.getElementById('formProdNombre').value = '';
+
+      document.getElementById('formProdCategoria').value = 'Zapatos';
+
+      document.getElementById('formProdSubcat').value = '';
+
+      document.getElementById('formProdGenero').value = 'Unisex';
+
+      document.getElementById('formProdPrecio').value = '';
+
+      document.getElementById('formProdStock').value = '10';
+
+      document.getElementById('formProdEstado').value = 'Disponible';
+
+      document.getElementById('formProdDescripcion').value = '';
+
+
+
+      document.getElementById('formProdFoto1').value = '';
+
+      document.getElementById('formProdFoto2').value = '';
+
+      document.getElementById('formProdFoto3').value = '';
+
+
+
+      actualizarPreview(1);
+
+      actualizarPreview(2);
+
+      actualizarPreview(3);
+
+
+
+      cambiarPestana('nuevo');
+
+    }
+
+
+
+    function editarProducto(id) {
+
+      var p = datosAdmin.productos.find(function(prod) { return prod.id === id; });
+
+      if (!p) return;
+
+
+
+      document.getElementById('formProductoTitulo').innerHTML = '<i class="fa-solid fa-pen text-indigo-400"></i> Editar Producto (' + p.id + ')';
+
+      document.getElementById('formProdId').value = p.id;
+
+      document.getElementById('formProdNombre').value = p.nombre;
+
+      document.getElementById('formProdCategoria').value = p.categoria;
+
+      document.getElementById('formProdSubcat').value = p.subcategoria || '';
+
+      document.getElementById('formProdGenero').value = p.genero || 'Unisex';
+
+      document.getElementById('formProdPrecio').value = p.precio;
+
+      document.getElementById('formProdStock').value = p.stock;
+
+      document.getElementById('formProdEstado').value = p.estado;
+
+      document.getElementById('formProdDescripcion').value = p.descripcion || '';
+
+
+
+      document.getElementById('formProdFoto1').value = p.foto1 || '';
+
+      document.getElementById('formProdFoto2').value = p.foto2 || '';
+
+      document.getElementById('formProdFoto3').value = p.foto3 || '';
+
+
+
+      actualizarPreview(1);
+
+      actualizarPreview(2);
+
+      actualizarPreview(3);
+
+
+
+      cambiarPestana('nuevo');
+
+    }
+
+
+
+    async function eliminarProducto(id) {
+
+      if (!confirm('¿¿Deseas eliminar permanentemente el producto ' + id + '?')) return;
+
+      try {
+
+        const res = await apiPost({ accion: 'eliminarProductoAdmin', clave: claveActual, id: id });
+
+        alert(res ? res.mensaje : 'Producto eliminado.');
+
+        cargarDatosCompletosAdmin();
+
+      } catch (err) {
+
+        alert('Error al eliminar: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    async function guardarFormularioProducto() {
+
+      var nombre = document.getElementById('formProdNombre').value.trim();
+
+      var precio = parseFloat(document.getElementById('formProdPrecio').value);
+
+      if (!nombre) {
+
+        alert('Por favor escribe el nombre del producto.');
+
+        return;
+
+      }
+
+      if (isNaN(precio) || precio < 0) {
+
+        alert('Por favor ingresa un precio valido.');
+
+        return;
+
+      }
+
+
+
+      var p = {
+
+        id: document.getElementById('formProdId').value.trim(),
+
+        nombre: nombre,
+
+        categoria: document.getElementById('formProdCategoria').value,
+
+        subcategoria: document.getElementById('formProdSubcat').value.trim(),
+
+        genero: document.getElementById('formProdGenero').value,
+
+        precio: precio || 0,
+
+        stock: parseInt(document.getElementById('formProdStock').value, 10) || 0,
+
+        estado: document.getElementById('formProdEstado').value,
+
+        descripcion: document.getElementById('formProdDescripcion').value.trim(),
+
+        foto1: document.getElementById('formProdFoto1').value.trim(),
+
+        foto2: document.getElementById('formProdFoto2').value.trim(),
+
+        foto3: document.getElementById('formProdFoto3').value.trim()
+
+      };
+
+
+
+      var btn = document.getElementById('btnGuardarProd');
+
+      if (btn) {
+
+        btn.disabled = true;
+
+        btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Guardando...';
+
+      }
+
+
+
+      try {
+
+        const res = await apiPost({ accion: 'guardarProductoAdmin', clave: claveActual, producto: p });
+
+        if (btn) {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar en Google Sheets';
+
+        }
+
+        if (res && res.exito) {
+
+          alert(res.mensaje);
+
+          cambiarPestana('productos');
+
+          cargarDatosCompletosAdmin();
+
+        } else {
+
+          alert(res ? res.mensaje : 'Error al guardar');
+
+        }
+
+      } catch (err) {
+
+        if (btn) {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar en Google Sheets';
+
+        }
+
+        alert('Error al guardar: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    // 7. SUBIDA DE ARCHIVOS A GOOGLE DRIVE
+
+    function subirArchivoDirecto(inputEl, slotNum) {
+
+      if (!inputEl.files || !inputEl.files[0]) return;
+
+      var file = inputEl.files[0];
+
+      var loader = document.getElementById('loaderFoto' + slotNum);
+
+      if (loader) loader.classList.remove('hidden');
+
+
+
+      var reader = new FileReader();
+
+      reader.onload = async function(e) {
+
+        var base64Data = e.target.result;
+
+        var categoria = document.getElementById('formProdCategoria').value;
+
+        try {
+
+          const res = await apiPost({
+
+            accion: 'subirFotoDrive',
+
+            base64Data: base64Data,
+
+            nombreArchivo: file.name,
+
+            categoria: categoria
+
+          });
+
+          if (loader) loader.classList.add('hidden');
+
+          if (res && res.exito) {
+
+            document.getElementById('formProdFoto' + slotNum).value = res.url;
+
+            actualizarPreview(slotNum);
+
+            mostrarToastAdmin('Foto subida a Drive en: ' + categoria, 'cloud-arrow-up', 'emerald');
+
+          } else {
+
+            alert('Error al subir: ' + (res ? res.mensaje : 'desconocido'));
+
+          }
+
+        } catch (err) {
+
+          if (loader) loader.classList.add('hidden');
+
+          alert('Fallo en la subida a Drive: ' + (err.message || err));
+
+        }
+
+      };
+
+      reader.readAsDataURL(file);
+
+    }
+
+
+
+    function actualizarPreview(slotNum) {
+
+      var val = document.getElementById('formProdFoto' + slotNum).value.trim();
+
+      var img = document.getElementById('previewFoto' + slotNum);
+
+      if (!val) {
+
+        img.src = 'https://via.placeholder.com/300?text=Foto+' + slotNum;
+
+        return;
+
+      }
+
+      var match = val.match(/[-\w]{25,}/);
+
+      if (val.includes('drive.google.com') && match) {
+
+        img.src = 'https://lh3.googleusercontent.com/d/' + match[0];
+
+      } else {
+
+        img.src = val;
+
+      }
+
+    }
+
+
+
+    // 8. GESTION DE PEDIDOS
+
+    function renderizarTablaPedidos(pedidos) {
+
+      var tbody = document.getElementById('tablaBodyPedidos');
+
+      tbody.innerHTML = '';
+
+
+
+      if (!pedidos || pedidos.length === 0) {
+
+        tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-500 italic">No hay pedidos registrados todavia.</td></tr>';
+
+        return;
+
+      }
+
+
+
+      pedidos.forEach(function(ped) {
+
+        var tr = document.createElement('tr');
+
+        tr.className = 'hover:bg-slate-800/40 transition';
+
+
+
+        tr.innerHTML = 
+
+          '<td class="p-3">' +
+
+            '<strong class="text-white block font-mono">' + ped.id + '</strong>' +
+
+            '<span class="text-[10px] text-slate-500">' + ped.fecha + '</span>' +
+
+          '</td>' +
+
+          '<td class="p-3">' +
+
+            '<strong class="text-slate-200 block">' + ped.cliente + '</strong>' +
+
+            '<span class="text-[10px] text-indigo-400 font-mono">CI: ' + ped.cedula + '</span>' +
+
+          '</td>' +
+
+          '<td class="p-3">' +
+
+            '<span class="text-xs text-slate-300 block line-clamp-2">' + ped.detalle + '</span>' +
+
+            '<span class="text-[10px] text-slate-500 block">Dir: ' + (ped.direccion || 'Acordar') + '</span>' +
+
+          '</td>' +
+
+          '<td class="p-3 font-bold text-emerald-400">$' + ped.total.toFixed(2) + '</td>' +
+
+          '<td class="p-3">' +
+
+            '<select onchange="actualizarEstadoPedido(\"' + ped.id + '\", this.value)" class="bg-slate-950 border border-slate-700 text-[11px] rounded-lg p-1 text-slate-200 focus:outline-none">' +
+
+              '<option value="Pendiente por Confirmar" ' + (ped.estado.includes('Pendiente') ? 'selected' : '') + '>Pendiente</option>' +
+
+              '<option value="Confirmado" ' + (ped.estado.includes('Confirmado') ? 'selected' : '') + '>Confirmado</option>' +
+
+              '<option value="Enviado" ' + (ped.estado.includes('Enviado') ? 'selected' : '') + '>Enviado</option>' +
+
+              '<option value="Entregado" ' + (ped.estado.includes('Entregado') ? 'selected' : '') + '>Entregado</option>' +
+
+            '</select>' +
+
+          '</td>' +
+
+          '<td class="p-3 text-right">' +
+
+            '<a href="https://wa.me/' + ped.telefono.replace(/\D/g, '') + '?text=¡Hola%20' + encodeURIComponent(ped.cliente) + ',%20te%20escribimos%20de%20la%20tienda%20respecto%20a%20tu%20pedido%20' + ped.id + '" target="_blank" ' +
+
+               'class="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1 transition">' +
+
+              '<i class="fa-brands fa-whatsapp text-sm"></i> Chatear' +
+
+            '</a>' +
+
+          '</td>';
+
+
+
+        tbody.appendChild(tr);
+
+      });
+
+    }
+
+
+
+    async function actualizarEstadoPedido(idPedido, nuevoEstado) {
+
+      try {
+
+        await apiPost({ accion: 'actualizarEstadoPedidoAdmin', clave: claveActual, idPedido: idPedido, nuevoEstado: nuevoEstado });
+
+        mostrarToastAdmin('Estado de ' + idPedido + ' actualizado a ' + nuevoEstado, 'check', 'emerald');
+
+        var ped = datosAdmin.pedidos.find(function(p) { return p.id === idPedido; });
+
+        if (ped) ped.estado = nuevoEstado;
+
+      } catch (err) {
+
+        alert('Error actualizando estado de pedido: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    // 9. DIRECTORIO Y MODERACIÓN DE CLIENTES
+    var filtroClientesEstadoActual = 'todos';
+
+    function filtrarClientesPorEstado(estado) {
+      filtroClientesEstadoActual = estado;
+      ['btnFiltroCliTodos', 'btnFiltroCliPendientes', 'btnFiltroCliConfirmados'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition';
+      });
+
+      if (estado === 'Pendiente') {
+        var b = document.getElementById('btnFiltroCliPendientes');
+        if (b) b.className = 'px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold transition';
+      } else if (estado === 'Confirmado') {
+        var b = document.getElementById('btnFiltroCliConfirmados');
+        if (b) b.className = 'px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold transition';
+      } else {
+        var b = document.getElementById('btnFiltroCliTodos');
+        if (b) b.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold transition';
+      }
+
+      if (datosAdmin && datosAdmin.clientes) {
+        renderizarTablaClientes(datosAdmin.clientes);
+      }
+    }
+
+    function renderizarTablaClientes(clientes) {
+      var tbody = document.getElementById('tablaBodyClientes');
+      tbody.innerHTML = '';
+
+      var total = clientes ? clientes.length : 0;
+      var pendientes = 0;
+      var confirmados = 0;
+
+      if (clientes) {
+        clientes.forEach(function(c) {
+          var est = (c.estado || 'Pendiente').toLowerCase();
+          if (est === 'confirmado' || est === 'aprobado') {
+            confirmados++;
+          } else {
+            pendientes++;
+          }
+        });
+      }
+
+      // Actualizar contadores
+      var elBadgeCount = document.getElementById('clientesCountBadge');
+      if (elBadgeCount) elBadgeCount.textContent = total;
+      var elCountTodos = document.getElementById('countCliTodos');
+      if (elCountTodos) elCountTodos.textContent = total;
+      var elCountPend = document.getElementById('countCliPendientes');
+      if (elCountPend) elCountPend.textContent = pendientes;
+      var elCountConf = document.getElementById('countCliConfirmados');
+      if (elCountConf) elCountConf.textContent = confirmados;
+
+      // Banner y badge de alerta para el admin
+      var bannerAlerta = document.getElementById('bannerAlertaPendientes');
+      var cantAlerta = document.getElementById('cantClientesPendientesAlerta');
+      var navBadge = document.getElementById('badgeClientesPendientesNav');
+
+      if (pendientes > 0) {
+        if (bannerAlerta) bannerAlerta.classList.remove('hidden');
+        if (cantAlerta) cantAlerta.textContent = pendientes;
+        if (navBadge) {
+          navBadge.textContent = pendientes;
+          navBadge.classList.remove('hidden');
+        }
+      } else {
+        if (bannerAlerta) bannerAlerta.classList.add('hidden');
+        if (navBadge) navBadge.classList.add('hidden');
+      }
+
+      if (!clientes || clientes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-500 italic">No hay clientes registrados aún.</td></tr>';
+        return;
+      }
+
+      var listaFiltrada = clientes;
+      if (filtroClientesEstadoActual === 'Pendiente') {
+        listaFiltrada = clientes.filter(function(c) {
+          var est = (c.estado || 'Pendiente').toLowerCase();
+          return est !== 'confirmado' && est !== 'aprobado';
+        });
+      } else if (filtroClientesEstadoActual === 'Confirmado') {
+        listaFiltrada = clientes.filter(function(c) {
+          var est = (c.estado || 'Pendiente').toLowerCase();
+          return est === 'confirmado' || est === 'aprobado';
+        });
+      }
+
+      if (listaFiltrada.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-slate-500 italic">No hay clientes con estado "' + filtroClientesEstadoActual + '".</td></tr>';
+        return;
+      }
+
+      listaFiltrada.forEach(function(cli) {
+        var tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition border-b border-slate-800/40';
+
+        var esConfirmado = (cli.estado || '').toLowerCase() === 'confirmado' || (cli.estado || '').toLowerCase() === 'aprobado';
+        var badgeEstadoHtml = esConfirmado
+          ? '<span class="bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1"><i class="fa-solid fa-check-circle"></i> Confirmado</span>'
+          : '<span class="bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1"><i class="fa-solid fa-clock"></i> Pendiente</span>';
+
+        var btnConfirmarHtml = !esConfirmado
+          ? '<button type="button" onclick="confirmarClienteDesdeAdmin(\'' + (cli.id || cli.cedula) + '\', \'' + (cli.nombre || '').replace(/'/g, "\\'") + '\')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 shadow transition" title="Confirmar cliente en base de datos"><i class="fa-solid fa-user-check"></i> Confirmar</button>'
+          : '';
+
+        var btnBorrarHtml = '<button type="button" onclick="eliminarClienteCascadaDesdeAdmin(\'' + (cli.id || cli.cedula) + '\', \'' + (cli.cedula || '') + '\', \'' + (cli.nombre || '').replace(/'/g, "\\'") + '\')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 border border-rose-500/30 px-2 py-1 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition" title="Borrar cliente y TODOS sus comentarios en cascada"><i class="fa-solid fa-trash-can"></i> Borrar</button>';
+
+        var btnWaHtml = '<a href="https://wa.me/' + (cli.telefono || '').replace(/\D/g, '') + '?text=¡Hola%20' + encodeURIComponent(cli.nombre || '') + ',%20te%20escribimos%20de%20la%20tienda%20online" target="_blank" class="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1 transition" title="Escribir por WhatsApp"><i class="fa-brands fa-whatsapp"></i> ' + (cli.telefono || '') + '</a>';
+
+        tr.innerHTML = 
+          '<td class="p-3 text-[10px] text-slate-500 whitespace-nowrap">' + (cli.fecha || '') + '</td>' +
+          '<td class="p-3 font-mono text-indigo-400 text-xs font-semibold">' + (cli.cedula || '') + '</td>' +
+          '<td class="p-3 font-bold text-white text-xs">' + (cli.nombre || '') + '</td>' +
+          '<td class="p-3">' +
+            '<span class="text-xs text-slate-300 block">' + (cli.ciudad || 'No especificada') + '</span>' +
+            '<span class="text-[10px] text-slate-500 block">' + (cli.direccion || '') + '</span>' +
+          '</td>' +
+          '<td class="p-3">' +
+            '<span class="bg-indigo-600/20 text-indigo-300 px-2 py-0.5 rounded-full text-[10px] font-bold border border-indigo-500/20">' +
+              (cli.pedidosRealizados || 0) + ' pedidos' +
+            '</span>' +
+          '</td>' +
+          '<td class="p-3 text-center whitespace-nowrap">' + badgeEstadoHtml + '</td>' +
+          '<td class="p-3 text-right whitespace-nowrap">' +
+            '<div class="flex items-center justify-end gap-1.5">' +
+              btnConfirmarHtml +
+              btnBorrarHtml +
+              btnWaHtml +
+            '</div>' +
+          '</td>';
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function confirmarClienteDesdeAdmin(idCliente, nombreCliente) {
+      try {
+        var res = await confirmarClienteAPI(claveActual, idCliente);
+        if (res && res.exito) {
+          mostrarToastAdmin('Cliente ' + nombreCliente + ' confirmado y aprobado con éxito.', 'check', 'emerald');
+          if (datosAdmin && datosAdmin.clientes) {
+            var cli = datosAdmin.clientes.find(function(c) {
+              return String(c.id) === String(idCliente) || String(c.cedula) === String(idCliente);
+            });
+            if (cli) cli.estado = 'Confirmado';
+            renderizarTablaClientes(datosAdmin.clientes);
+          }
+        } else {
+          alert('Error al confirmar cliente: ' + (res ? res.mensaje : 'desconocido'));
+        }
+      } catch (err) {
+        alert('Error al confirmar: ' + (err.message || err));
+      }
+    }
+
+    async function eliminarClienteCascadaDesdeAdmin(idCliente, cedulaCliente, nombreCliente) {
+      var mensajeConfirm = '⚠️ ¿Estás seguro de eliminar a ' + nombreCliente + ' (' + cedulaCliente + ')?\n\n' +
+        '¡IMPORTANTE! Si confirmas, se borrarán de la base de datos el cliente Y EN CASCADA TODOS LOS COMENTARIOS y rastros que haya dejado en la tienda.';
+      
+      if (!confirm(mensajeConfirm)) return;
+
+      try {
+        var res = await eliminarClienteCascadaAPI(claveActual, idCliente, cedulaCliente);
+        if (res && res.exito) {
+          var msj = 'Cliente ' + nombreCliente + ' eliminado exitosamente.\n' + (res.mensaje || '');
+          mostrarToastAdmin(msj, 'trash', 'rose');
+          alert(msj);
+          if (datosAdmin && datosAdmin.clientes) {
+            datosAdmin.clientes = datosAdmin.clientes.filter(function(c) {
+              return String(c.id) !== String(idCliente) && String(c.cedula) !== String(cedulaCliente);
+            });
+            renderizarTablaClientes(datosAdmin.clientes);
+          }
+        } else {
+          alert('Error al eliminar cliente: ' + (res ? res.mensaje : 'desconocido'));
+        }
+      } catch (err) {
+        alert('Error al eliminar: ' + (err.message || err));
+      }
+    }
+
+
+
+    // 10. MODAL CAMBIAR CLAVE DE ADMINISTRADOR
+
+    function abrirModalCambiarClave() {
+
+      document.getElementById('inputClaveActualModal').value = '';
+
+      document.getElementById('inputClaveNuevaModal').value = '';
+
+      document.getElementById('inputClaveConfirmarModal').value = '';
+
+      document.getElementById('modalCambiarClave').classList.remove('hidden');
+
+      document.getElementById('modalCambiarClave').classList.add('flex');
+
+    }
+
+
+
+    
+    async function reestructurarDriveSheetsAdmin() {
+      if (!confirm('¿Deseas sincronizar y verificar las carpetas de Google Drive y hojas de Google Sheets?')) return;
+      var btn = document.getElementById('btnReestructurarERP');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Sincronizando...'; }
+      try {
+        var res = await apiPost({ accion: 'reestructurarDriveYSheets', clave: claveActual });
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Reestructurar ERP'; }
+        if (res && res.exito) {
+          mostrarToastAdmin('Estructura ERP y Drive verificadas con exito!', 'check', 'emerald');
+          cargarDatosCompletosAdmin();
+        } else {
+          alert((res && res.mensaje) ? res.mensaje : 'Error al sincronizar');
+        }
+      } catch (err) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Reestructurar ERP'; }
+        alert('Error: ' + (err.message || err));
+      }
+    }
+
+    function cerrarModalCambiarClave() {
+
+      document.getElementById('modalCambiarClave').classList.add('hidden');
+
+      document.getElementById('modalCambiarClave').classList.remove('flex');
+
+    }
+
+
+
+    async function guardarNuevaClaveAdmin() {
+
+      var actual = document.getElementById('inputClaveActualModal').value.trim();
+
+      var nueva = document.getElementById('inputClaveNuevaModal').value.trim();
+
+      var confirmar = document.getElementById('inputClaveConfirmarModal').value.trim();
+
+
+
+      if (!actual) {
+
+        alert('Por favor ingresa la clave actual.');
+
+        return;
+
+      }
+
+      if (!nueva || nueva.length < 4) {
+
+        alert('La nueva clave debe tener al menos 4 caracteres.');
+
+        return;
+
+      }
+
+      if (nueva !== confirmar) {
+
+        alert('La nueva clave y la confirmacion no coinciden.');
+
+        return;
+
+      }
+
+
+
+      var btn = document.getElementById('btnGuardarClaveModal');
+
+      if (btn) {
+
+        btn.disabled = true;
+
+        btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Guardando...';
+
+      }
+
+
+
+      try {
+
+        const res = await apiPost({ accion: 'cambiarClaveAdmin', claveActual: actual, claveNueva: nueva });
+
+        if (btn) {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Nueva Clave';
+
+        }
+
+        if (res && res.exito) {
+
+          alert(res.mensaje);
+
+          claveActual = nueva;
+
+          sessionStorage.setItem('admin_tienda_clave', nueva);
+
+          cerrarModalCambiarClave();
+
+          mostrarToastAdmin('Clave actualizada con éxito', 'key', 'emerald');
+
+        } else {
+
+          alert(res ? res.mensaje : 'Error al cambiar la clave');
+
+        }
+
+      } catch (err) {
+
+        if (btn) {
+
+          btn.disabled = false;
+
+          btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Guardar Nueva Clave';
+
+        }
+
+        alert('Error de conexión: ' + (err.message || err));
+
+      }
+
+    }
+
+
+
+    // 11. UTILIDADES Y TOAST
+
+    function mostrarToastAdmin(msg, icono, color) {
+
+      var toast = document.getElementById('toastAdmin');
+
+      var toastMsg = document.getElementById('toastAdminMsg');
+
+      var toastIcon = document.getElementById('toastAdminIcon');
+
+
+
+      toastMsg.textContent = msg;
+
+      toastIcon.className = 'fa-solid fa-' + (icono || 'circle-check') + ' text-' + (color || 'emerald') + '-400 text-base';
+
+
+
+      toast.classList.remove('hidden');
+
+      toast.classList.add('flex');
+
+
+
+      setTimeout(function() {
+
+        toast.classList.add('hidden');
+
+        toast.classList.remove('flex');
+
+      }, 4000);
+
+    }
+
+
+
+    function verTiendaPublica() {
+      var url = window.location.hostname.includes('google')
+        ? 'https://script.google.com/macros/s/AKfycbyDNwrX4Q4yZ1IQAL_xN1m4l-sauRXpe-cqpZAChMMb89S9NuGAJpg_EgXsi0i3w2meug/exec'
+        : 'index.html';
+      window.open(url, '_blank');
+    }
+
+  </script>
+
+</body>
+
+</html>

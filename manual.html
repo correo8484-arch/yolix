@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual Integral del Sistema, Arquitectura y Tutorial Operativo | Tienda ERP</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Estilos de scrollbar personalizados */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    .code-block {
+      background: #090d16;
+      border: 1px solid #1e293b;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- ======================================================== -->
+  <!-- 1. BARRA SUPERIOR FIJA / ENCABEZADO EJECUTIVO -->
+  <!-- ======================================================== -->
+  <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between flex-wrap gap-4">
+      
+      <!-- Logotipo & Título -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center shadow-lg shadow-indigo-500/25">
+          <i class="fa-solid fa-book-bookmark text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-extrabold tracking-tight text-white">Manual del Sistema &amp; Arquitectura</h1>
+            <span class="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">v2.0 ERP</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Cuenta Maestra: <span class="text-indigo-300 font-mono">amazoncorreohumberto@gmail.com</span></p>
+        </div>
+      </div>
+
+      <!-- Accesos Directos a Componentes Vivos -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <a id="btnNavTienda" href="index.html" target="_blank" rel="noopener noreferrer"
+           class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
+          <i class="fa-solid fa-store text-emerald-400"></i> Ver Tienda
+        </a>
+
+        <a id="btnNavAdmin" href="admin.html" target="_blank" rel="noopener noreferrer"
+           class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+          <i class="fa-solid fa-shield-halved text-indigo-400"></i> Panel Admin
+        </a>
+
+        <a href="https://docs.google.com/spreadsheets/d/166eEGe5hrox8qd0EuUWcPUyIgEr6J-Ib5oeS_t-eCrA/edit?authuser=amazoncorreohumberto@gmail.com" target="_blank" rel="noopener noreferrer"
+           class="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+          <i class="fa-solid fa-table text-emerald-400"></i> Google Sheets
+        </a>
+
+        <a href="https://drive.google.com/drive/folders/1bJy7-78Hd8_qhzr0OM7oin4BuUxiqX8w?authuser=amazoncorreohumberto@gmail.com" target="_blank" rel="noopener noreferrer"
+           class="bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+          <i class="fa-brands fa-google-drive text-amber-400"></i> Google Drive
+        </a>
+
+        <a href="https://drive.google.com/drive/folders/1FmLUxwX2xT8e8zj6bHL8lkIF10hFbgG3?authuser=amazoncorreohumberto@gmail.com" target="_blank" rel="noopener noreferrer"
+           class="bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5">
+          <i class="fa-solid fa-palette text-teal-400"></i> Activos Web
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ======================================================== -->
+  <!-- 2. CONTENIDO PRINCIPAL: DOS COLUMNAS (SIDEBAR + CUERPO) -->
+  <!-- ======================================================== -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+      <!-- ==================================================== -->
+      <!-- BARRA LATERAL (ÍNDICE NAVEGABLE STICKY) -->
+      <!-- ==================================================== -->
+      <aside class="lg:col-span-3 lg:sticky lg:top-20 space-y-6">
+        
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+              <i class="fa-solid fa-list-ul text-indigo-400"></i> Índice del Documento
+            </h2>
+            <span class="text-[10px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded-full">7 Módulos</span>
+          </div>
+
+          <!-- Buscador en tiempo real de temas -->
+          <div class="relative mb-4">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-500 text-xs"></i>
+            <input type="text" id="inputBuscarManual" oninput="filtrarManual(this.value)" placeholder="Buscar en el manual..." 
+                   class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <!-- Lista de Secciones -->
+          <nav class="space-y-1 text-xs">
+            <a href="#sec-arquitectura" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition">
+              <span class="w-5 text-indigo-400 font-bold">1.</span> Ecosistema &amp; Arquitectura
+            </a>
+            <a href="#sec-reglas" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition">
+              <span class="w-5 text-emerald-400 font-bold">2.</span> Reglas de Negocio &amp; BD
+            </a>
+            <a href="#sec-drive" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition">
+              <span class="w-5 text-amber-400 font-bold">3.</span> Carpetas Google Drive (9)
+            </a>
+            <a href="#sec-sheets" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition">
+              <span class="w-5 text-teal-400 font-bold">4.</span> Estructura ERP Sheets
+            </a>
+            <a href="#sec-tutorial" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition">
+              <span class="w-5 text-violet-400 font-bold">5.</span> Tutorial Operativo Admin
+            </a>
+            <a href="#sec-archivos" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition">
+              <span class="w-5 text-blue-400 font-bold">6.</span> Inventario de Archivos
+            </a>
+            <a href="#sec-faq" class="sidebar-link flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/80 transition">
+              <span class="w-5 text-rose-400 font-bold">7.</span> Preguntas Frecuentes (FAQ)
+            </a>
+          </nav>
+        </div>
+
+        <!-- Tarjeta de Soporte Rápido -->
+        <div class="bg-gradient-to-br from-indigo-950/40 to-slate-900 border border-indigo-900/30 rounded-2xl p-5 shadow-lg">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
+              <i class="fa-solid fa-key text-xs"></i>
+            </div>
+            <div>
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Credencial Maestra</div>
+              <div class="text-xs font-bold text-white">Clave por Defecto</div>
+            </div>
+          </div>
+          <div class="mt-2 bg-slate-950/80 rounded-xl p-2.5 flex items-center justify-between border border-slate-800">
+            <code class="text-emerald-400 font-mono text-xs font-bold" id="badgeClave">admin2026</code>
+            <button onclick="copiarClave('admin2026')" class="text-[11px] text-slate-400 hover:text-white transition flex items-center gap-1">
+              <i class="fa-regular fa-copy"></i> Copiar
+            </button>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- ==================================================== -->
+      <!-- CUERPO PRINCIPAL DEL MANUAL -->
+      <!-- ==================================================== -->
+      <main class="lg:col-span-9 space-y-12">
+
+        <!-- Banner de Bienvenida -->
+        <div class="relative overflow-hidden bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-900 border border-indigo-900/40 rounded-3xl p-6 sm:p-8 shadow-2xl">
+          <div class="absolute -right-8 -top-8 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="relative z-10 max-w-2xl">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 mb-4">
+              <i class="fa-solid fa-circle-check text-emerald-400"></i> Sistema Desacoplado &bull; 100% Operativo
+            </span>
+            <h2 class="text-2xl sm:text-3xl font-black text-white tracking-tight leading-snug">
+              Manual de Operaciones &amp; Arquitectura de Software
+            </h2>
+            <p class="text-slate-300 text-sm mt-3 leading-relaxed">
+              Esta guía documenta la infraestructura integral de la tienda en línea, el funcionamiento de la API en Google Apps Script, las 9 carpetas de Google Drive, el diseño ERP en Google Sheets y los procedimientos paso a paso para el administrador.
+            </p>
+          </div>
+        </div>
+
+        <!-- ==================================================== -->
+        <!-- SECCIÓN 1: ECOSISTEMA Y ARQUITECTURA -->
+        <!-- ==================================================== -->
+        <section id="sec-arquitectura" class="scroll-mt-24 space-y-6">
+          <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 flex items-center justify-center font-bold text-sm">1</span>
+              <h3 class="text-xl font-bold text-white tracking-tight">Ecosistema y Arquitectura del Sistema</h3>
+            </div>
+            <span class="text-xs text-indigo-400 font-mono">Arquitectura Híbrida</span>
+          </div>
+
+          <p class="text-sm text-slate-300 leading-relaxed">
+            El sistema ha sido desacoplado para resolver el problema del banner de Google Apps Script (<em>"Esta aplicación la ha creado un usuario de Google Apps Script"</em>). Ahora opera con una separación completa entre la capa visual (Frontend) y los servicios de base de datos (Backend):
+          </p>
+
+          <!-- Diagrama de 3 Capas -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center">
+                <i class="fa-solid fa-desktop text-base"></i>
+              </div>
+              <h4 class="text-sm font-bold text-white">1. Frontend Desacoplado</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Archivos <code class="text-indigo-300">index.html</code>, <code class="text-indigo-300">admin.html</code> y <code class="text-indigo-300">manual.html</code> alojados en Netlify, Vercel o servidor local. Carga ultra rápida sin banners de Google.
+              </p>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+              <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
+                <i class="fa-solid fa-network-wired text-base"></i>
+              </div>
+              <h4 class="text-sm font-bold text-white">2. Backend API REST</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Google Apps Script (<code class="text-indigo-300">Codigo.gs</code>) que actúa exclusivamente como enrutador HTTP respondiendo solicitudes en formato JSON seguro (<code class="text-indigo-300">doGet</code> y <code class="text-indigo-300">doPost</code>).
+              </p>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                <i class="fa-solid fa-database text-base"></i>
+              </div>
+              <h4 class="text-sm font-bold text-white">3. Base de Datos &amp; Drive</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Google Sheets almacena clientes, pedidos e inventario con reglas ERP. Google Drive hospeda todas las imágenes en 9 carpetas públicas optimizadas.
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Callout Informativo -->
+          <div class="bg-slate-900/60 border-l-4 border-indigo-500 p-4 rounded-r-2xl">
+            <div class="flex items-start gap-3">
+              <i class="fa-solid fa-circle-info text-indigo-400 text-sm mt-0.5"></i>
+              <div class="text-xs text-slate-300 leading-relaxed">
+                <strong>¿Cómo se comunican el Frontend y el Backend?</strong> Todas las peticiones se realizan mediante la función estándar <code class="text-indigo-300 font-mono">fetch()</code> hacia el Web App desplegado en Apps Script. Las subidas de fotos y actualizaciones de precio se transmiten asíncronamente con <code class="text-indigo-300 font-mono">Content-Type: text/plain</code> para sortear el preflight CORS sin bloqueos de navegador.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================================================== -->
+        <!-- SECCIÓN 2: REGLAS DE NEGOCIO Y BASE DE DATOS -->
+        <!-- ==================================================== -->
+        <section id="sec-reglas" class="scroll-mt-24 space-y-6">
+          <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 flex items-center justify-center font-bold text-sm">2</span>
+              <h3 class="text-xl font-bold text-white tracking-tight">Documento de Reglas del Negocio</h3>
+            </div>
+            <span class="text-xs text-emerald-400 font-mono">Reglas ERP</span>
+          </div>
+
+          <div class="space-y-4">
+            
+            <!-- Regla 1 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+                  <i class="fa-solid fa-check text-xs"></i> Regla 1: Integridad y Formato de Productos
+                </h4>
+                <span class="text-[10px] bg-emerald-500/10 text-emerald-400 font-bold px-2 py-0.5 rounded-md">Obligatoria</span>
+              </div>
+              <ul class="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
+                <li><strong>Identificador Único:</strong> Cada producto cuenta con un código alfanumérico secuencial (<code class="text-slate-200 font-mono">P01</code>, <code class="text-slate-200 font-mono">P02</code>, etc.).</li>
+                <li><strong>Moneda Base:</strong> Todos los precios se manejan en dólares americanos (<code class="text-slate-200 font-mono">$ USD</code>) con formato contable <code class="text-slate-200 font-mono">$#,##0.00</code>.</li>
+                <li><strong>Stock:</strong> Debe ser un número entero mayor o igual a cero (<code class="text-slate-200 font-mono">&gt;= 0</code>).</li>
+                <li><strong>Estados Permitidos:</strong> Únicamente se admiten <code class="text-emerald-400">Disponible</code> (verde), <code class="text-rose-400">Agotado</code> (rojo) o <code class="text-amber-400">En Oferta</code> (amarillo).</li>
+              </ul>
+            </div>
+
+            <!-- Regla 2 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-indigo-400 flex items-center gap-2">
+                  <i class="fa-solid fa-tags text-xs"></i> Regla 2: Categorías Estandarizadas
+                </h4>
+                <span class="text-[10px] bg-indigo-500/10 text-indigo-400 font-bold px-2 py-0.5 rounded-md">8 Productos + 1 Activos</span>
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Para garantizar la sincronización automática con Google Drive, los productos solo pueden pertenecer a una de las siguientes categorías oficiales:
+              </p>
+              <div class="flex flex-wrap gap-2 pt-1">
+                <span class="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1 rounded-lg text-slate-300"><i class="fa-solid fa-shoe-prints text-indigo-400 mr-1"></i> Zapatos</span>
+                <span class="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1 rounded-lg text-slate-300"><i class="fa-solid fa-dumbbell text-indigo-400 mr-1"></i> Deportes</span>
+                <span class="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1 rounded-lg text-slate-300"><i class="fa-solid fa-person-dress text-indigo-400 mr-1"></i> Ropa Mujer</span>
+                <span class="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1 rounded-lg text-slate-300"><i class="fa-solid fa-shirt text-indigo-400 mr-1"></i> Ropa Hombre</span>
+                <span class="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1 rounded-lg text-slate-300"><i class="fa-solid fa-child text-indigo-400 mr-1"></i> Ropa Niños</span>
+                <span class="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1 rounded-lg text-slate-300"><i class="fa-solid fa-baby text-indigo-400 mr-1"></i> Bebés</span>
+                <span class="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1 rounded-lg text-slate-300"><i class="fa-solid fa-car text-indigo-400 mr-1"></i> Carros</span>
+                <span class="bg-slate-950 border border-slate-800 text-xs px-2.5 py-1 rounded-lg text-slate-300"><i class="fa-solid fa-glasses text-indigo-400 mr-1"></i> Accesorios</span>
+                <span class="bg-teal-950/40 border border-teal-800/40 text-xs px-2.5 py-1 rounded-lg text-teal-300 font-semibold"><i class="fa-solid fa-palette text-teal-400 mr-1"></i> Activos Web (Logos/Banners)</span>
+              </div>
+            </div>
+
+            <!-- Regla 3 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-amber-400 flex items-center gap-2">
+                  <i class="fa-solid fa-star text-xs"></i> Regla 3: Comentarios y Reseñas Verificadas
+                </h4>
+                <span class="text-[10px] bg-amber-500/10 text-amber-400 font-bold px-2 py-0.5 rounded-md">Anti-Spam</span>
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Para proteger la reputación de la tienda y evitar spam:
+              </p>
+              <ul class="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
+                <li>Solo los usuarios con Cédula o Teléfono registrados en la pestaña <code class="text-slate-200 font-mono">Clientes</code> pueden publicar comentarios y calificaciones de 1 a 5 estrellas.</li>
+                <li>Si un cliente no está registrado, el sistema abre automáticamente el formulario de registro rápido antes de recibir la reseña.</li>
+              </ul>
+            </div>
+
+            <!-- Regla 4 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-sm font-bold text-violet-400 flex items-center gap-2">
+                  <i class="fa-solid fa-lock text-xs"></i> Regla 4: Seguridad y Contraseñas
+                </h4>
+                <span class="text-[10px] bg-violet-500/10 text-violet-400 font-bold px-2 py-0.5 rounded-md">ScriptProperties</span>
+              </div>
+              <ul class="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
+                <li>La clave de administrador se almacena de forma persistente y cifrada en el servicio interno <code class="text-slate-200 font-mono">PropertiesService.getScriptProperties()</code> bajo la clave <code class="text-slate-200 font-mono">CLAVE_ADMIN</code>.</li>
+                <li>Al cambiar la contraseña desde el panel de control, se guarda al instante sin necesidad de volver a desplegar la aplicación web.</li>
+              </ul>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ==================================================== -->
+        <!-- SECCIÓN 3: ESTRUCTURA GOOGLE DRIVE (9 SECCIONES) -->
+        <!-- ==================================================== -->
+        <section id="sec-drive" class="scroll-mt-24 space-y-6">
+          <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-xl bg-amber-600/20 text-amber-400 border border-amber-500/20 flex items-center justify-center font-bold text-sm">3</span>
+              <h3 class="text-xl font-bold text-white tracking-tight">Estructura Oficial de Google Drive</h3>
+            </div>
+            <span class="text-xs text-amber-400 font-mono">9 Subcarpetas Públicas</span>
+          </div>
+
+          <p class="text-sm text-slate-300 leading-relaxed">
+            Todas las imágenes se gestionan dentro de la carpeta raíz <strong class="text-white">Tienda Catalogo - Imagenes</strong>. Cada subcarpeta cuenta con permisos de lectura pública para que las fotografías se visualicen de forma inmediata a alta velocidad en el catálogo:
+          </p>
+
+          <!-- Grid de las 9 Carpetas -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            
+            <!-- CAT-00 -->
+            <div class="bg-slate-900 border border-teal-500/30 rounded-2xl p-4 flex items-center justify-between hover:border-teal-500/60 transition group">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center justify-center text-base">
+                  <i class="fa-solid fa-palette"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white group-hover:text-teal-300 transition">0. Activos Web y Marca</div>
+                  <div class="text-[11px] text-slate-400">Logos, banners y portadas del sitio</div>
+                </div>
+              </div>
+              <a href="https://drive.google.com/drive/folders/1FmLUxwX2xT8e8zj6bHL8lkIF10hFbgG3?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+                 class="bg-slate-800 hover:bg-teal-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                Abrir <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+
+            <!-- CAT-01 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between hover:border-indigo-500/60 transition group">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center text-base">
+                  <i class="fa-solid fa-shoe-prints"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">1. Zapatos y Calzado</div>
+                  <div class="text-[11px] text-slate-400">Deportivos, sandalias, botas, casual</div>
+                </div>
+              </div>
+              <a href="https://drive.google.com/drive/folders/1czbUHo3Xm6IQAF4RPTAMTLTIyTFblmx-?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+                 class="bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                Abrir <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+
+            <!-- CAT-02 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between hover:border-indigo-500/60 transition group">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center text-base">
+                  <i class="fa-solid fa-dumbbell"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">2. Deportes y Fitness</div>
+                  <div class="text-[11px] text-slate-400">Prendas de entreno, ligas, pesas</div>
+                </div>
+              </div>
+              <a href="https://drive.google.com/drive/folders/19t9WvDxIn2idUgWh3eopVp1J5J5Qawwq?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+                 class="bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                Abrir <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+
+            <!-- CAT-03 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between hover:border-indigo-500/60 transition group">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center text-base">
+                  <i class="fa-solid fa-person-dress"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">3. Ropa para Mujer</div>
+                  <div class="text-[11px] text-slate-400">Vestidos, blusas, conjuntos femeninos</div>
+                </div>
+              </div>
+              <a href="https://drive.google.com/drive/folders/1ORPUtuLaVXkJZe-4pDhfoqPByxnAFVIF?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+                 class="bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                Abrir <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+
+            <!-- CAT-04 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between hover:border-indigo-500/60 transition group">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center text-base">
+                  <i class="fa-solid fa-shirt"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">4. Ropa para Hombre</div>
+                  <div class="text-[11px] text-slate-400">Camisas, pantalones, bermudas</div>
+                </div>
+              </div>
+              <a href="https://drive.google.com/drive/folders/1Vbh09VnVROI7JdMKFap30JoWG0DTh7rZ?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+                 class="bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                Abrir <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+
+            <!-- CAT-05 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between hover:border-indigo-500/60 transition group">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center text-base">
+                  <i class="fa-solid fa-child"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">5. Ropa para Niños</div>
+                  <div class="text-[11px] text-slate-400">Moda y conjuntos para niños y niñas</div>
+                </div>
+              </div>
+              <a href="https://drive.google.com/drive/folders/1_BqR9EGP4jh5K5WcwfM6qReKiD2RaATi?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+                 class="bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                Abrir <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+
+            <!-- CAT-06 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between hover:border-indigo-500/60 transition group">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center text-base">
+                  <i class="fa-solid fa-baby"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">6. Bebés y Maternal</div>
+                  <div class="text-[11px] text-slate-400">Ropa de recién nacido, accesorios</div>
+                </div>
+              </div>
+              <a href="https://drive.google.com/drive/folders/19ysLqNHvcbOUubaPE3011TrC3zEXU9my?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+                 class="bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                Abrir <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+
+            <!-- CAT-07 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between hover:border-indigo-500/60 transition group">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center text-base">
+                  <i class="fa-solid fa-car"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">7. Carros y Repuestos</div>
+                  <div class="text-[11px] text-slate-400">Lubricantes, bombillos LED, repuestos</div>
+                </div>
+              </div>
+              <a href="https://drive.google.com/drive/folders/1sX3xJEqkuFSXYsdxZsNpfeBtvOhfdm_i?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+                 class="bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                Abrir <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+
+            <!-- CAT-08 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between hover:border-indigo-500/60 transition group md:col-span-2">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center text-base">
+                  <i class="fa-solid fa-glasses"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-bold text-white group-hover:text-indigo-300 transition">8. Accesorios Generales</div>
+                  <div class="text-[11px] text-slate-400">Lentes de sol, relojes, billeteras, mochilas</div>
+                </div>
+              </div>
+              <a href="https://drive.google.com/drive/folders/1nHg4WucDTXREtWxyhopKjF5vq_4W9gc1?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+                 class="bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1">
+                Abrir <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ==================================================== -->
+        <!-- SECCIÓN 4: ESTRUCTURA ERP GOOGLE SHEETS -->
+        <!-- ==================================================== -->
+        <section id="sec-sheets" class="scroll-mt-24 space-y-6">
+          <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-xl bg-teal-600/20 text-teal-400 border border-teal-500/20 flex items-center justify-center font-bold text-sm">4</span>
+              <h3 class="text-xl font-bold text-white tracking-tight">Estructura Oficial de Google Sheets (Diseño ERP)</h3>
+            </div>
+            <a href="https://docs.google.com/spreadsheets/d/166eEGe5hrox8qd0EuUWcPUyIgEr6J-Ib5oeS_t-eCrA/edit?authuser=amazoncorreohumberto@gmail.com" target="_blank" 
+               class="text-xs text-teal-400 hover:underline flex items-center gap-1">
+              Abrir Hoja <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+            </a>
+          </div>
+
+          <p class="text-sm text-slate-300 leading-relaxed">
+            La hoja de cálculo funciona como un sistema ERP profesional con código de colores, filas inmovilizadas, validaciones dropdown y formatos contables:
+          </p>
+
+          <div class="space-y-4">
+            
+            <!-- Pestaña Productos -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-3.5 h-3.5 rounded-md bg-[#1e293b] border border-slate-600"></span>
+                  <h4 class="text-sm font-bold text-white">Pestaña "Productos" (Encabezado #1e293b - Azul Pizarra)</h4>
+                </div>
+                <span class="text-[11px] text-slate-400 font-mono">12 Columnas</span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr class="bg-slate-950 text-slate-400 border-b border-slate-800">
+                      <th class="py-2 px-3">Columna</th>
+                      <th class="py-2 px-3">Nombre</th>
+                      <th class="py-2 px-3">Formato / Validación</th>
+                      <th class="py-2 px-3">Descripción</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-800 text-slate-300">
+                    <tr><td class="py-2 px-3 font-mono text-indigo-400">A</td><td class="py-2 px-3 font-semibold text-white">ID</td><td class="py-2 px-3">Texto plano</td><td class="py-2 px-3">Código secuencial (P01, P02...)</td></tr>
+                    <tr><td class="py-2 px-3 font-mono text-indigo-400">B</td><td class="py-2 px-3 font-semibold text-white">Nombre</td><td class="py-2 px-3">Texto</td><td class="py-2 px-3">Nombre comercial del artículo</td></tr>
+                    <tr><td class="py-2 px-3 font-mono text-indigo-400">C</td><td class="py-2 px-3 font-semibold text-white">Categoria</td><td class="py-2 px-3 text-amber-300">Dropdown oficial</td><td class="py-2 px-3">8 Categorías oficiales</td></tr>
+                    <tr><td class="py-2 px-3 font-mono text-indigo-400">D</td><td class="py-2 px-3 font-semibold text-white">Subcategoria</td><td class="py-2 px-3">Texto</td><td class="py-2 px-3">Subclasificación libre (ej. Running)</td></tr>
+                    <tr><td class="py-2 px-3 font-mono text-indigo-400">E</td><td class="py-2 px-3 font-semibold text-white">Genero</td><td class="py-2 px-3 text-amber-300">Dropdown</td><td class="py-2 px-3">Unisex, Femenino, Masculino, Niños, Bebés</td></tr>
+                    <tr><td class="py-2 px-3 font-mono text-indigo-400">F</td><td class="py-2 px-3 font-semibold text-emerald-400">Precio ($)</td><td class="py-2 px-3 font-mono text-emerald-300">$#,##0.00</td><td class="py-2 px-3">Valor de venta en dólares</td></tr>
+                    <tr><td class="py-2 px-3 font-mono text-indigo-400">G..I</td><td class="py-2 px-3 font-semibold text-white">Foto1, Foto2, Foto3</td><td class="py-2 px-3">URL Imagen</td><td class="py-2 px-3">Enlace directo a Google Drive / Web</td></tr>
+                    <tr><td class="py-2 px-3 font-mono text-indigo-400">J</td><td class="py-2 px-3 font-semibold text-white">Descripcion</td><td class="py-2 px-3">Texto multilínea</td><td class="py-2 px-3">Ficha técnica y detalles</td></tr>
+                    <tr><td class="py-2 px-3 font-mono text-indigo-400">K</td><td class="py-2 px-3 font-semibold text-white">Stock</td><td class="py-2 px-3 font-mono">#,##0</td><td class="py-2 px-3">Unidades físicas en almacén</td></tr>
+                    <tr><td class="py-2 px-3 font-mono text-indigo-400">L</td><td class="py-2 px-3 font-semibold text-white">Estado</td><td class="py-2 px-3 text-amber-300">Dropdown + Formato Condicional</td><td class="py-2 px-3">Disponible, Agotado, En Oferta</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Pestaña Categorias -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <div class="flex items-center gap-2">
+                <span class="w-3.5 h-3.5 rounded-md bg-[#0f766e]"></span>
+                <h4 class="text-sm font-bold text-white">Pestaña "Categorias" (Encabezado #0f766e - Azul Verde)</h4>
+              </div>
+              <p class="text-xs text-slate-400">
+                Guarda la tabla de sincronización automática de Google Drive: <code class="text-slate-300 font-mono">ID_Categoria, Categoria, Nombre_Carpeta_Drive, URL_Carpeta_Drive, ID_Carpeta_Drive, Descripcion</code>.
+              </p>
+            </div>
+
+            <!-- Pestaña Pedidos -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <div class="flex items-center gap-2">
+                <span class="w-3.5 h-3.5 rounded-md bg-[#3730a3]"></span>
+                <h4 class="text-sm font-bold text-white">Pestaña "Pedidos" (Encabezado #3730a3 - Índigo)</h4>
+              </div>
+              <p class="text-xs text-slate-400">
+                Registra las compras realizadas por clientes: <code class="text-slate-300 font-mono">ID_Pedido, Fecha, Cedula_Cliente, Nombre_Cliente, Telefono, Detalle_Productos, Monto_Total ($), Estado_Pedido, Direccion_Envio</code>. Incluye menú desplegable y colores automáticos para los estados: <span class="text-amber-300">Pendiente</span>, <span class="text-blue-300">En Proceso</span>, <span class="text-violet-300">Enviado</span>, <span class="text-emerald-300">Entregado</span> y <span class="text-rose-300">Cancelado</span>.
+              </p>
+            </div>
+
+            <!-- Pestaña Clientes -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <div class="flex items-center gap-2">
+                <span class="w-3.5 h-3.5 rounded-md bg-[#065f46]"></span>
+                <h4 class="text-sm font-bold text-white">Pestaña "Clientes" (Encabezado #065f46 - Verde Bosque)</h4>
+              </div>
+              <p class="text-xs text-slate-400">
+                Directorio maestro de clientes verificados con Cédula/DNI y Teléfono en formato texto plano (<code class="text-slate-300 font-mono">@</code>) para preservar ceros a la izquierda y guiones.
+              </p>
+            </div>
+
+            <!-- Pestaña Comentarios -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <div class="flex items-center gap-2">
+                <span class="w-3.5 h-3.5 rounded-md bg-[#92400e]"></span>
+                <h4 class="text-sm font-bold text-white">Pestaña "Comentarios" (Encabezado #92400e - Ámbar)</h4>
+              </div>
+              <p class="text-xs text-slate-400">
+                Almacena las valoraciones y puntuaciones con estrellas (1 a 5) enlazadas a la cédula del cliente autenticado.
+              </p>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ==================================================== -->
+        <!-- SECCIÓN 5: TUTORIAL OPERATIVO PASO A PASO -->
+        <!-- ==================================================== -->
+        <section id="sec-tutorial" class="scroll-mt-24 space-y-6">
+          <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-xl bg-violet-600/20 text-violet-400 border border-violet-500/20 flex items-center justify-center font-bold text-sm">5</span>
+              <h3 class="text-xl font-bold text-white tracking-tight">Tutorial Operativo para el Administrador</h3>
+            </div>
+            <span class="text-xs text-violet-400 font-mono">Guía Paso a Paso</span>
+          </div>
+
+          <div class="space-y-6">
+            
+            <!-- 5.1 Login -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+              <div class="flex items-center gap-2 text-indigo-400 text-sm font-bold">
+                <span class="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-xs">5.1</span>
+                Cómo Iniciar Sesión en el Panel Administrador
+              </div>
+              <ol class="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
+                <li>Abre tu enlace de administración (en modo local, en Netlify o en Google Apps Script): <br>
+                  <code class="text-indigo-300 bg-slate-950 px-2 py-1 rounded-md inline-block mt-1">https://script.google.com/macros/s/AKfycbyDNwrX4Q4yZ1IQAL_xN1m4l-sauRXpe-cqpZAChMMb89S9NuGAJpg_EgXsi0i3w2meug/exec?page=admin</code>
+                </li>
+                <li>Escribe la clave de administrador: <strong class="text-emerald-400 font-mono">admin2026</strong>.</li>
+                <li>Presiona <strong class="text-white">"Entrar al Panel"</strong> o presiona Enter en tu teclado.</li>
+              </ol>
+            </div>
+
+            <!-- 5.2 Cambiar Clave -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+              <div class="flex items-center gap-2 text-indigo-400 text-sm font-bold">
+                <span class="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-xs">5.2</span>
+                Cómo Cambiar la Clave de Acceso
+              </div>
+              <ol class="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
+                <li>Una vez dentro del panel, haz clic en el botón superior morado <strong class="text-indigo-300"><i class="fa-solid fa-key"></i> Cambiar Clave</strong>.</li>
+                <li>Escribe tu clave actual (<code class="text-slate-200 font-mono">admin2026</code> o la que tengas configurada).</li>
+                <li>Escribe tu nueva clave y repítela en el campo de confirmación.</li>
+                <li>Haz clic en <strong class="text-white">"Guardar Nueva Clave"</strong>. El sistema la registrará inmediatamente en Google Apps Script.</li>
+              </ol>
+            </div>
+
+            <!-- 5.3 Crear Producto con Fotos -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+              <div class="flex items-center gap-2 text-indigo-400 text-sm font-bold">
+                <span class="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-xs">5.3</span>
+                Cómo Crear un Producto y Subir Fotos a Google Drive
+              </div>
+              <ol class="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
+                <li>Haz clic en la pestaña <strong class="text-emerald-400">+ Agregar Producto</strong> en el panel.</li>
+                <li>Ingresa el <strong>Nombre del Producto</strong> (ej. <em>Zapatos Deportivos Running</em>).</li>
+                <li>Selecciona la <strong>Categoría</strong> (ej. <em>Zapatos</em>). Esta selección determina a qué carpeta de Google Drive irá la foto.</li>
+                <li>Ingresa Precio en dólares, Stock y Descripción.</li>
+                <li>En la sección de fotos, haz clic en <strong>"Seleccionar archivo"</strong> para Foto Principal, Foto 2 o Foto 3. En 2 segundos se subirá directamente a Drive y se generará el enlace público automático.</li>
+                <li>Haz clic en el botón azul <strong class="text-white">"Guardar en Google Sheets"</strong>. ¡El producto ya estará disponible en la tienda!</li>
+              </ol>
+            </div>
+
+            <!-- 5.4 Edición Rápida -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+              <div class="flex items-center gap-2 text-indigo-400 text-sm font-bold">
+                <span class="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-xs">5.4</span>
+                Cómo Editar Precios y Stock en 1 Segundo (Edición en Vivo)
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                No necesitas rellenar formularios completos para hacer ajustes rápidos de stock o precio:
+              </p>
+              <ul class="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
+                <li><strong>Cambiar Precio:</strong> Haz clic directamente sobre la cifra del precio en la tabla, digita el nuevo número (ej. <code class="text-emerald-400 font-mono">25.50</code>) y haz clic afuera o presiona Enter. Se guardará de inmediato en Google Sheets.</li>
+                <li><strong>Cambiar Stock:</strong> Haz clic en el número de stock y modifícalo.</li>
+                <li><strong>Alternar Estado:</strong> Haz clic sobre la etiqueta de estado para alternar entre <span class="text-emerald-400">Disponible</span> y <span class="text-rose-400">Agotado</span> con un solo toque.</li>
+              </ul>
+            </div>
+
+            <!-- 5.5 Logo y Banners -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+              <div class="flex items-center gap-2 text-indigo-400 text-sm font-bold">
+                <span class="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-xs">5.5</span>
+                Dónde Colocar el Logo, Portadas y Banners
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Haz clic en el botón <strong class="text-teal-400"><i class="fa-solid fa-palette"></i> Activos Web</strong> en el encabezado del panel. Esto abrirá la subcarpeta <code class="text-teal-300">0. Activos Web y Marca (Logos y Banners)</code> en Google Drive. Arrastra allí tus logotipos (formato PNG transparente recomendado) y banners publicitarios para usarlos en el sitio web.
+              </p>
+            </div>
+
+            <!-- 5.6 Despliegue en Netlify -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-3">
+              <div class="flex items-center gap-2 text-indigo-400 text-sm font-bold">
+                <span class="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-xs">5.6</span>
+                Cómo Publicar en Netlify (Cero Banners de Google)
+              </div>
+              <ol class="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
+                <li>Abre en tu navegador la herramienta gratuita de Netlify: <a href="https://app.netlify.com/drop" target="_blank" class="text-indigo-400 hover:underline font-bold">app.netlify.com/drop</a>.</li>
+                <li>Abre el explorador de archivos de Windows en tu computadora y ubica la carpeta <code class="text-slate-200 font-mono">J:\texto\web</code>.</li>
+                <li>Arrastra y suelta la carpeta <strong>web</strong> dentro de la ventana de Netlify.</li>
+                <li>¡Listo! En 10 segundos Netlify te generará un enlace público HTTPS rápido y limpio (ej. <em>mi-tienda-oficial.netlify.app</em>) completamente libre de advertencias o avisos de Apps Script.</li>
+              </ol>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ==================================================== -->
+        <!-- SECCIÓN 6: INVENTARIO DE ARCHIVOS LOCALES -->
+        <!-- ==================================================== -->
+        <section id="sec-archivos" class="scroll-mt-24 space-y-6">
+          <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/20 flex items-center justify-center font-bold text-sm">6</span>
+              <h3 class="text-xl font-bold text-white tracking-tight">Inventario de Archivos de la Carpeta Local</h3>
+            </div>
+            <span class="text-xs text-blue-400 font-mono">Ruta: J:\texto</span>
+          </div>
+
+          <div class="overflow-x-auto bg-slate-900 border border-slate-800 rounded-2xl">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-slate-950 text-slate-400 border-b border-slate-800">
+                  <th class="py-3 px-4">Ubicación / Archivo</th>
+                  <th class="py-3 px-4">Función Principal</th>
+                  <th class="py-3 px-4">Plataforma Destino</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800 text-slate-300">
+                <tr class="hover:bg-slate-800/40">
+                  <td class="py-3 px-4 font-mono font-semibold text-indigo-400">web/index.html</td>
+                  <td class="py-3 px-4">Catálogo visual para los clientes (búsqueda, filtros, carrito WhatsApp y reseñas).</td>
+                  <td class="py-3 px-4"><span class="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">Netlify / Local</span></td>
+                </tr>
+                <tr class="hover:bg-slate-800/40">
+                  <td class="py-3 px-4 font-mono font-semibold text-indigo-400">web/admin.html</td>
+                  <td class="py-3 px-4">Panel ERP completo: productos, métricas, clientes, pedidos y fotos.</td>
+                  <td class="py-3 px-4"><span class="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">Netlify / Local</span></td>
+                </tr>
+                <tr class="hover:bg-slate-800/40">
+                  <td class="py-3 px-4 font-mono font-semibold text-indigo-400">web/manual.html</td>
+                  <td class="py-3 px-4">Este manual interactivo con tutorial, reglas, arquitectura y accesos directos.</td>
+                  <td class="py-3 px-4"><span class="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">Netlify / Local</span></td>
+                </tr>
+                <tr class="hover:bg-slate-800/40">
+                  <td class="py-3 px-4 font-mono font-semibold text-indigo-400">web/api.js</td>
+                  <td class="py-3 px-4">Cliente de conexión HTTP asíncrono para enviar y recibir datos JSON de Apps Script.</td>
+                  <td class="py-3 px-4"><span class="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded">Netlify / Local</span></td>
+                </tr>
+                <tr class="hover:bg-slate-800/40">
+                  <td class="py-3 px-4 font-mono font-semibold text-emerald-400">Codigo.gs</td>
+                  <td class="py-3 px-4">Backend de Google Apps Script: enrutador API REST, inicialización de hojas y subida a Drive.</td>
+                  <td class="py-3 px-4"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded">Google Apps Script</span></td>
+                </tr>
+                <tr class="hover:bg-slate-800/40">
+                  <td class="py-3 px-4 font-mono font-semibold text-emerald-400">Index.html / Admin.html</td>
+                  <td class="py-3 px-4">Copias sincronizadas dentro del editor de Apps Script para ejecución embebida directa.</td>
+                  <td class="py-3 px-4"><span class="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded">Google Apps Script</span></td>
+                </tr>
+                <tr class="hover:bg-slate-800/40">
+                  <td class="py-3 px-4 font-mono font-semibold text-slate-400">MANUAL_DEL_SISTEMA.md</td>
+                  <td class="py-3 px-4">Versión en formato Markdown del manual maestro para lectura offline o en GitHub.</td>
+                  <td class="py-3 px-4"><span class="bg-slate-800 text-slate-400 px-2 py-0.5 rounded">Documentación</span></td>
+                </tr>
+                <tr class="hover:bg-slate-800/40">
+                  <td class="py-3 px-4 font-mono font-semibold text-amber-400">NOTAS_ATAJOS_Y_SELECTORES.md</td>
+                  <td class="py-3 px-4">Índice rápido de atajos, selectores DOM exactos y comandos para ahorro de tokens.</td>
+                  <td class="py-3 px-4"><span class="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded">Atajos &amp; Selectores</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ==================================================== -->
+        <!-- SECCIÓN 7: PREGUNTAS FRECUENTES (FAQ) -->
+        <!-- ==================================================== -->
+        <section id="sec-faq" class="scroll-mt-24 space-y-6">
+          <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-xl bg-rose-600/20 text-rose-400 border border-rose-500/20 flex items-center justify-center font-bold text-sm">7</span>
+              <h3 class="text-xl font-bold text-white tracking-tight">Preguntas Frecuentes y Solución de Problemas</h3>
+            </div>
+            <span class="text-xs text-rose-400 font-mono">FAQ</span>
+          </div>
+
+          <div class="space-y-4">
+            
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-circle-question text-indigo-400"></i> ¿Por qué el botón "Ver Tienda" antes abría otro navegador externo?
+              </h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Dentro del entorno aislado de Apps Script (<code class="text-slate-200 font-mono">script.googleusercontent.com</code>), la instrucción JavaScript <code class="text-slate-200 font-mono">window.open('index.html')</code> provocaba que Windows no reconociera la URL relativa y abriera el navegador predeterminado del sistema operativo. Ya ha sido corregido utilizando un enlace HTML nativo (<code class="text-slate-200 font-mono">&lt;a target="_blank" rel="noopener noreferrer"&gt;</code>) con la URL absoluta, lo que garantiza que se abra siempre en una <strong>pestaña contigua en el mismo navegador</strong>.
+              </p>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-circle-question text-indigo-400"></i> ¿Qué ocurre si agrego el parámetro "?authuser=amazon..." al Web App?
+              </h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Google Apps Script en su endpoint de ejecución (<code class="text-slate-200 font-mono">/exec</code>) produce un error ("No se puede abrir el archivo") si se le añade <code class="text-slate-200 font-mono">?authuser=...</code> porque el script ya está desplegado con autorización fija <em>"Ejecutar como yo (amazoncorreohumberto@gmail.com)"</em>. La URL del Web App debe mantenerse limpia sin ese parámetro. En cambio, Google Drive y Google Sheets sí admiten perfectamente <code class="text-slate-200 font-mono">?authuser=amazoncorreohumberto@gmail.com</code>.
+              </p>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+              <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-circle-question text-indigo-400"></i> ¿Cómo recuperar el acceso si olvido la clave de administrador?
+              </h4>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Ingresa al <a href="https://script.google.com/u/2/home/projects/16cunyMHD_eviXb8dee8enatSl7AzILjPsTtjH7XGIrvyrGsHa_jW5kk-/edit?authuser=amazoncorreohumberto@gmail.com" target="_blank" class="text-indigo-400 hover:underline">Editor de Google Apps Script</a>, ve a la pestaña de <strong>Configuración del proyecto</strong> (icono de engranaje a la izquierda), y en la sección <strong>Propiedades de la secuencia de comandos</strong> elimina la propiedad <code class="text-slate-200 font-mono">CLAVE_ADMIN</code>. Al recargar el panel, volverá a activarse la clave de fábrica: <code class="text-emerald-400 font-mono">admin2026</code>.
+              </p>
+            </div>
+
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 3. PIE DE PÁGINA -->
+  <!-- ======================================================== -->
+  <footer class="bg-slate-900 border-t border-slate-800 mt-16 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between flex-wrap gap-4 text-xs text-slate-500">
+      <div>
+        Sistema de Comercio Electrónico &bull; Desarrollado para <strong class="text-slate-400">amazoncorreohumberto@gmail.com</strong>
+      </div>
+      <div class="flex items-center gap-4">
+        <span>Arquitectura v2.0 ERP</span>
+        <span>&bull;</span>
+        <a href="#sec-arquitectura" class="hover:text-slate-300 transition">Volver arriba &uarr;</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ======================================================== -->
+  <!-- 4. SCRIPT DE INTERACTIVIDAD DEL MANUAL -->
+  <!-- ======================================================== -->
+  <script>
+    // Detección automática de entorno (Apps Script vs Local / Netlify)
+    (function ajustarEnlacesDinamicos() {
+      var esGoogle = window.location.hostname.includes('google');
+      var btnTienda = document.getElementById('btnNavTienda');
+      var btnAdmin = document.getElementById('btnNavAdmin');
+
+      if (esGoogle) {
+        if (btnTienda) btnTienda.href = 'https://script.google.com/macros/s/AKfycbyDNwrX4Q4yZ1IQAL_xN1m4l-sauRXpe-cqpZAChMMb89S9NuGAJpg_EgXsi0i3w2meug/exec';
+        if (btnAdmin) btnAdmin.href = 'https://script.google.com/macros/s/AKfycbyDNwrX4Q4yZ1IQAL_xN1m4l-sauRXpe-cqpZAChMMb89S9NuGAJpg_EgXsi0i3w2meug/exec?page=admin';
+      } else {
+        if (btnTienda) btnTienda.href = 'index.html';
+        if (btnAdmin) btnAdmin.href = 'admin.html';
+      }
+    })();
+
+    // Copiar clave al portapapeles
+    function copiarClave(texto) {
+      navigator.clipboard.writeText(texto).then(function() {
+        var badge = document.getElementById('badgeClave');
+        var anterior = badge.textContent;
+        badge.textContent = '¡Copiada!';
+        setTimeout(function() { badge.textContent = anterior; }, 2000);
+      });
+    }
+
+    // Filtro en tiempo real para buscar en el manual
+    function filtrarManual(query) {
+      query = (query || '').toLowerCase().trim();
+      var secciones = document.querySelectorAll('main > section');
+      
+      secciones.forEach(function(sec) {
+        if (!query) {
+          sec.style.display = '';
+          return;
+        }
+        var texto = sec.textContent.toLowerCase();
+        if (texto.includes(query)) {
+          sec.style.display = '';
+        } else {
+          sec.style.display = 'none';
+        }
+      });
+    }
+  </script>
+
+</body>
+</html>

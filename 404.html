@@ -1,0 +1,2434 @@
+<!DOCTYPE html>
+
+<html lang="es">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Catálogo Digital Dinámico</title>
+
+  <!-- Tailwind CSS -->
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Canvas Confetti for Motion Graphics Celebrations -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .star-rating .fa-star { transition: transform 0.15s ease, color 0.15s ease; }
+    .star-rating .fa-star:hover { transform: scale(1.2); }
+
+    /* ========================================== */
+    /* MOTION GRAPHICS KEYFRAMES & STYLES         */
+    /* ========================================== */
+    @keyframes floatGlow {
+      0%, 100% { transform: translate(0px, 0px) scale(1); opacity: 0.22; }
+      50% { transform: translate(35px, -25px) scale(1.12); opacity: 0.38; }
+    }
+
+    @keyframes floatGlow2 {
+      0%, 100% { transform: translate(0px, 0px) scale(1.08); opacity: 0.18; }
+      50% { transform: translate(-40px, 30px) scale(0.94); opacity: 0.32; }
+    }
+
+    @keyframes cardFadeUp {
+      0% {
+        opacity: 0;
+        transform: translateY(22px) scale(0.96);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 16px rgba(99, 102, 241, 0.45), 0 0 35px rgba(99, 102, 241, 0.2); }
+      50% { box-shadow: 0 0 28px rgba(99, 102, 241, 0.8), 0 0 55px rgba(139, 92, 246, 0.4); }
+    }
+
+    @keyframes bubblePop {
+      0% { opacity: 0; transform: scale(0.88) translateY(8px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .ambient-glow-1 {
+      animation: floatGlow 14s ease-in-out infinite;
+      filter: blur(85px);
+    }
+
+    .ambient-glow-2 {
+      animation: floatGlow2 18s ease-in-out infinite;
+      filter: blur(95px);
+    }
+
+    .motion-gradient-text {
+      background-size: 200% auto;
+      animation: gradientShift 5s ease infinite;
+    }
+
+    .motion-pulse-glow {
+      animation: pulseGlow 2.8s ease-in-out infinite;
+    }
+
+    .producto-card {
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: transform, box-shadow;
+    }
+
+    .producto-card:hover {
+      transform: translateY(-8px) scale(1.015);
+      border-color: rgba(99, 102, 241, 0.6) !important;
+      box-shadow: 0 20px 35px -10px rgba(99, 102, 241, 0.25), 0 10px 20px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .img-zoom {
+      transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .producto-card:hover .img-zoom {
+      transform: scale(1.08);
+    }
+
+    .btn-motion {
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-motion:active {
+      transform: scale(0.95);
+    }
+
+    .bubble-animate {
+      animation: bubblePop 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+
+  <script>
+const API_URL = 'https://script.google.com/macros/s/AKfycbyDNwrX4Q4yZ1IQAL_xN1m4l-sauRXpe-cqpZAChMMb89S9NuGAJpg_EgXsi0i3w2meug/exec';
+let TELEFONO_WHATSAPP = '584120666322';
+
+function ejecutarEnAppsScript(nombre, args) {
+  return new Promise(function(resolve, reject) {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      return reject(new Error('google.script.run no disponible'));
+    }
+    var runner = google.script.run
+      .withSuccessHandler(function(res) { resolve(res); })
+      .withFailureHandler(function(err) { reject(err); });
+    runner[nombre].apply(runner, args || []);
+  });
+}
+
+async function apiGet(params) {
+  params = params || {};
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    var accion = params.accion;
+    if (accion === 'obtenerCatalogo') {
+      var p = await ejecutarEnAppsScript('obtenerDatosCatalogo', []);
+      var cats = [];
+      try {
+        cats = await ejecutarEnAppsScript('obtenerCategoriasPublicas', []);
+      } catch (e) {}
+      return { exito: true, productos: p, categorias: cats };
+    }
+    if (accion === 'verificarCliente') return await ejecutarEnAppsScript('verificarClienteEnSheet', [params.cedula || params.identificador]);
+  }
+
+  const query = new URLSearchParams(params).toString();
+  const url = API_URL + '?' + query;
+  const resp = await fetch(url, { method: 'GET', redirect: 'follow' });
+  if (!resp.ok) throw new Error('HTTP Error: ' + resp.status);
+  return await resp.json();
+}
+
+async function apiPost(payload) {
+  payload = payload || {};
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    var accion = payload.accion;
+    if (accion === 'guardarPedido') return await ejecutarEnAppsScript('registrarPedidoEnSheet', [payload.pedido]);
+    if (accion === 'guardarComentario') return await ejecutarEnAppsScript('guardarComentarioEnSheet', [payload.comentario]);
+    if (accion === 'registrarCliente') return await ejecutarEnAppsScript('registrarClienteEnSheet', [payload.cliente]);
+  }
+
+  const resp = await fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    redirect: 'follow'
+  });
+  if (!resp.ok) throw new Error('HTTP Error: ' + resp.status);
+  return await resp.json();
+}
+
+// ==========================================
+// MÓDULO DE MARCA Y CONFIGURACIÓN DINÁMICA
+// ==========================================
+const CLAVE_STORAGE_CONFIG = 'tienda_config_marca_v1';
+const CONFIG_MARCA_DEFAULT = {
+  nombreTienda: 'Catálogo Virtual',
+  sloganTienda: 'Tienda Online • Pedidos Directos',
+  logoUrl: '',
+  fuente: 'Inter',
+  telefonoWA: '584120666322'
+};
+
+async function obtenerConfiguracionMarca() {
+  try {
+    const res = await apiGet({ accion: 'obtenerConfigTienda' });
+    if (res && res.exito && res.config) {
+      localStorage.setItem(CLAVE_STORAGE_CONFIG, JSON.stringify(res.config));
+      return res.config;
+    }
+  } catch (e) {}
+
+  try {
+    const local = localStorage.getItem(CLAVE_STORAGE_CONFIG);
+    if (local) return { ...CONFIG_MARCA_DEFAULT, ...JSON.parse(local) };
+  } catch (e) {}
+
+  return CONFIG_MARCA_DEFAULT;
+}
+
+// ==========================================
+// MÓDULO DE CHAT WEB CLIENTE
+// ==========================================
+const CLAVE_STORAGE_CHATS = 'tienda_chats_mensajes_v1';
+
+async function enviarMensajeChat(mensajeData) {
+  const nuevoMsg = {
+    id: 'MSG-' + Date.now(),
+    fecha: new Date().toISOString(),
+    clienteId: String(mensajeData.clienteId || 'ANON').trim(),
+    clienteNombre: String(mensajeData.clienteNombre || 'Cliente').trim(),
+    clienteTelefono: String(mensajeData.clienteTelefono || '').trim(),
+    remitente: mensajeData.remitente || 'cliente',
+    mensaje: String(mensajeData.mensaje || '').trim(),
+    leido: false
+  };
+
+  try {
+    let chats = JSON.parse(localStorage.getItem(CLAVE_STORAGE_CHATS) || '[]');
+    chats.push(nuevoMsg);
+    localStorage.setItem(CLAVE_STORAGE_CHATS, JSON.stringify(chats));
+  } catch (e) {}
+
+  try {
+    const res = await apiPost({
+      accion: 'enviarMensajeChat',
+      datos: nuevoMsg
+    });
+    return res && res.exito ? res : { exito: true, mensajeId: nuevoMsg.id };
+  } catch (e) {
+    return { exito: true, mensajeId: nuevoMsg.id, local: true };
+  }
+}
+
+async function obtenerHistorialChat(clienteId) {
+  const idLimpio = String(clienteId || '').trim();
+  try {
+    const res = await apiGet({ accion: 'obtenerMensajesCliente', clienteId: idLimpio });
+    if (res && res.exito && Array.isArray(res.mensajes)) {
+      return res.mensajes;
+    }
+  } catch (e) {}
+
+  try {
+    const chats = JSON.parse(localStorage.getItem(CLAVE_STORAGE_CHATS) || '[]');
+    return chats.filter(m => m.clienteId === idLimpio || (m.clienteTelefono && m.clienteTelefono === idLimpio));
+  } catch (e) {
+    return [];
+  }
+}
+</script>
+
+</head>
+
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
+
+  <!-- AMBIENT MOTION GRAPHIC GLOW ORBS -->
+  <div class="fixed inset-0 pointer-events-none overflow-hidden z-0">
+    <div class="ambient-glow-1 absolute -top-40 -left-40 w-96 h-96 rounded-full bg-gradient-to-tr from-indigo-600/25 via-violet-600/15 to-cyan-500/10"></div>
+    <div class="ambient-glow-2 absolute top-1/3 -right-40 w-[420px] h-[420px] rounded-full bg-gradient-to-bl from-purple-600/20 via-indigo-600/15 to-blue-500/10"></div>
+    <div class="ambient-glow-1 absolute -bottom-40 left-1/4 w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-cyan-600/10 via-indigo-600/10 to-violet-800/15"></div>
+  </div>
+
+  <!-- TOP HEADER / NAVBAR -->
+  <header class="bg-slate-950/90 backdrop-blur-md text-white shadow-xl sticky top-0 z-40 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="seleccionarCategoria('Todos')">
+        <div id="headerLogoContainer" class="flex items-center justify-center">
+          <img id="headerLogoImg" src="" alt="Logo" class="hidden h-11 w-11 object-contain rounded-2xl shadow-md border border-slate-700/50 bg-slate-900 p-0.5">
+          <div id="headerLogoIcon" class="bg-gradient-to-tr from-indigo-600 to-violet-500 p-2.5 rounded-2xl text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center">
+            <i class="fa-solid fa-bag-shopping text-xl"></i>
+          </div>
+        </div>
+        <div>
+          <h1 id="headerTituloTienda" class="motion-gradient-text text-lg md:text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">Catálogo Virtual</h1>
+          <p id="headerSloganTienda" class="text-[11px] text-slate-400 font-medium">Tienda Online &bull; Pedidos Directos</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <button onclick="abrirModalRegistro()" class="btn-motion bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white px-4 py-2.5 rounded-xl font-semibold text-xs shadow-md shadow-indigo-600/30 transition flex items-center gap-2">
+          <i class="fa-solid fa-id-card"></i>
+          <span id="txtBtnRegistro">Registro Cliente</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MICRO-BANNER ANIMADO DE BENEFICIOS (MOTION GRAPHICS) -->
+  <div class="relative z-10 border-b border-slate-800/60 bg-slate-950/40 backdrop-blur-sm">
+    <div class="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-4 overflow-x-auto no-scrollbar text-[11px] text-slate-300">
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+        <span class="font-semibold text-emerald-400">Catálogo en Vivo</span>
+        <span class="text-slate-600">•</span>
+        <span class="text-slate-400">Inventario directo desde Google Sheets</span>
+      </div>
+      <div class="flex items-center gap-4 flex-shrink-0 font-medium">
+        <span class="flex items-center gap-1.5 hover:text-indigo-300 transition">
+          <i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i> Despacho Rápido
+        </span>
+        <span class="flex items-center gap-1.5 hover:text-indigo-300 transition">
+          <i class="fa-brands fa-whatsapp text-emerald-400 text-xs"></i> Pedidos por WhatsApp
+        </span>
+        <span class="flex items-center gap-1.5 hover:text-indigo-300 transition">
+          <i class="fa-solid fa-headset text-cyan-400 text-[10px]"></i> Chat Directo en Web
+        </span>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- SEARCH & CATEGORY BAR -->
+
+  <section class="max-w-7xl mx-auto px-4 pt-6 pb-2 w-full">
+
+    <!-- Search Box -->
+
+    <div class="bg-slate-800/80 backdrop-blur border border-slate-700/80 rounded-2xl p-3 shadow-lg flex items-center gap-3 mb-4">
+
+      <i class="fa-solid fa-magnifying-glass text-slate-400 pl-2"></i>
+
+      <input type="text" id="inputBuscador" name="buscador" oninput="filtrarProductos()" placeholder="Buscar por nombre, descripción, marca o repuesto..." 
+
+             class="bg-transparent w-full text-sm text-white placeholder-slate-400 focus:outline-none">
+
+      <button onclick="limpiarBuscador()" id="btnLimpiarBusqueda" class="hidden text-slate-400 hover:text-white text-xs pr-2">
+
+        <i class="fa-solid fa-xmark"></i>
+
+      </button>
+
+    </div>
+
+
+
+    <!-- Pestañas Directas de Categorías (Una sola fila deslizable) -->
+
+    <div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-2" id="contenedorCategorias">
+        <button onclick="seleccionarCategoria('Todos')" data-cat="Todos" class="btn-categoria active whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm bg-indigo-600 text-white shadow-indigo-600/30 flex items-center gap-1.5">
+          <i class="fa-solid fa-border-all"></i> Todos
+        </button>
+        <button onclick="seleccionarCategoria('Zapatos')" data-cat="Zapatos" class="btn-categoria whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-shoe-prints text-emerald-400"></i> Zapatos
+        </button>
+        <button onclick="seleccionarCategoria('Deportes')" data-cat="Deportes" class="btn-categoria whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-dumbbell text-sky-400"></i> Deportes
+        </button>
+        <button onclick="seleccionarCategoria('Ropa Mujer')" data-cat="Ropa Mujer" class="btn-categoria whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-person-dress text-pink-400"></i> Ropa Mujer
+        </button>
+        <button onclick="seleccionarCategoria('Ropa Hombre')" data-cat="Ropa Hombre" class="btn-categoria whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-person text-blue-400"></i> Ropa Hombre
+        </button>
+        <button onclick="seleccionarCategoria('Ropa Niños')" data-cat="Ropa Niños" class="btn-categoria whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-child text-amber-400"></i> Ropa Niños
+        </button>
+        <button onclick="seleccionarCategoria('Bebés')" data-cat="Bebés" class="btn-categoria whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-baby text-indigo-400"></i> Bebés
+        </button>
+        <button onclick="seleccionarCategoria('Carros')" data-cat="Carros" class="btn-categoria whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-car text-rose-400"></i> Carros
+        </button>
+        <button onclick="seleccionarCategoria('Accesorios')" data-cat="Accesorios" class="btn-categoria whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-glasses text-teal-400"></i> Accesorios
+        </button>
+      </div>
+
+  </section>
+
+
+
+  <!-- PRODUCT GRID -->
+
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+
+    <!-- Spinner / Loading -->
+
+    <div id="cargando" class="flex flex-col items-center justify-center py-20">
+
+      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+
+      <p class="text-sm text-slate-400">Cargando catálogo desde Google Sheets y Drive...</p>
+
+    </div>
+
+
+
+    <!-- Empty State -->
+
+    <div id="sinResultados" class="hidden text-center py-20">
+
+      <div class="inline-flex p-4 rounded-full bg-slate-800 text-slate-400 text-3xl mb-3">
+
+        <i class="fa-solid fa-box-open"></i>
+
+      </div>
+
+      <h3 class="text-base font-bold text-slate-200">No encontramos productos</h3>
+
+      <p class="text-xs text-slate-400 mt-1">Prueba con otra búsqueda o selecciona otra categoría.</p>
+
+    </div>
+
+
+
+    <!-- Grid -->
+
+    <div id="gridProductos" data-id="cuadriculaProductos" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+
+  </main>
+
+
+
+  <!-- MODAL DE DETALLES DEL PRODUCTO (AMPLIADO Y MEJORADO) -->
+
+  <div id="modalProducto" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl relative flex flex-col my-auto text-slate-100">
+
+      
+
+      <!-- Modal Close Button -->
+
+      <button id="btnCerrarModalProducto" onclick="cerrarModalProducto()" class="absolute top-4 right-4 z-20 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white w-9 h-9 rounded-full flex items-center justify-center transition">
+
+        <i class="fa-solid fa-xmark text-base"></i>
+
+      </button>
+
+
+
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 p-6 sm:p-8">
+
+        
+
+        <!-- COLUMNA MULTIMEDIA / IMÁGENES (7 de 12 columnas en escritorio) -->
+
+        <div class="md:col-span-7 flex flex-col space-y-3">
+
+          <!-- Contenedor Imagen Grande -->
+
+          <div onclick="abrirLightbox()" class="relative h-80 sm:h-96 md:h-[400px] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center group cursor-pointer shadow-inner">
+
+            <img id="modalFotoPrincipal" src="" alt="Producto" class="w-full h-full object-contain p-2 transition-transform duration-300 group-hover:scale-105">
+
+            <!-- Badge para expandir a pantalla completa -->
+
+            <div class="absolute bottom-3 right-3 bg-slate-900/80 hover:bg-indigo-600 text-white text-xs px-3 py-1.5 rounded-xl backdrop-blur-sm flex items-center gap-1.5 shadow-lg transition">
+
+              <i class="fa-solid fa-expand"></i> Ver Pantalla Completa
+
+            </div>
+
+            <!-- Etiqueta de Stock -->
+
+            <span id="modalStock" class="absolute top-3 left-3 px-2.5 py-1 text-[11px] font-bold rounded-lg shadow-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"></span>
+
+          </div>
+
+
+
+          <!-- Miniaturas de fotos adicionales -->
+
+          <div id="modalMiniaturas" class="flex gap-2.5 overflow-x-auto no-scrollbar py-1"></div>
+
+        </div>
+
+
+
+        <!-- COLUMNA INFORMACIÓN DEL PRODUCTO (5 de 12 columnas) -->
+
+        <div class="md:col-span-5 flex flex-col justify-between space-y-4">
+
+          <div>
+
+            <div class="flex items-center gap-2 mb-2">
+
+              <span id="modalCategoria" class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider bg-indigo-500/10 px-2.5 py-1 rounded-md border border-indigo-500/20"></span>
+
+              <span id="modalGenero" class="text-[11px] font-medium text-slate-400 bg-slate-800 px-2.5 py-1 rounded-md"></span>
+
+            </div>
+
+            
+
+            <h2 id="modalTitulo" class="text-xl sm:text-2xl font-bold text-white leading-tight mb-2"></h2>
+
+            
+
+            <div class="flex items-baseline gap-3 mb-4">
+
+              <span id="modalPrecio" class="text-3xl font-extrabold text-white"></span>
+
+              <span class="text-xs text-slate-400 font-semibold">USD &bull; IVA Incluido</span>
+
+            </div>
+
+
+
+            <div class="border-t border-slate-800 pt-3">
+
+              <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wide mb-1.5">Descripción</h4>
+
+              <p id="modalDescripcion" class="text-xs sm:text-sm text-slate-300 leading-relaxed max-h-36 overflow-y-auto pr-1"></p>
+
+            </div>
+
+          </div>
+
+
+
+          <!-- Botón de Pedido por WhatsApp -->
+
+          <div class="pt-2">
+
+            <button id="btnComprarWA" onclick="abrirModalPedido()" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2.5 text-sm">
+
+              <i class="fa-brands fa-whatsapp text-lg"></i>
+
+              Comprar / Pedir por WhatsApp
+
+            </button>
+
+          </div>
+
+        </div>
+
+
+
+      </div>
+
+
+
+      <!-- SECCIÓN DE COMENTARIOS Y RESEÑAS VALIDADAS -->
+
+      <div class="border-t border-slate-800 bg-slate-950/60 p-6 sm:p-8 rounded-b-3xl">
+
+        <div class="flex items-center justify-between mb-4">
+
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+
+            <i class="fa-solid fa-comments text-indigo-400"></i>
+
+            Opiniñones de Clientes Registrados (<span id="modalTotalComentarios">0</span>)
+
+          </h3>
+
+        </div>
+
+
+
+        <!-- FORMULARIO DE COMENTARIOS: ESTADO CONDICIONAL -->
+
+        <div id="bloqueFormularioComentario" class="mb-6">
+
+          
+
+          <!-- Caso 1: Cliente NO identificado / NO registrado -->
+
+          <div id="panelComentarioBloqueado" class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 text-center">
+
+            <div class="inline-flex p-2.5 rounded-full bg-amber-500/10 text-amber-400 mb-2">
+
+              <i class="fa-solid fa-shield-halved text-xl"></i>
+
+            </div>
+
+            <h4 class="text-sm font-bold text-white mb-1">Solo los clientes registrados pueden dejar opiniones</h4>
+
+            <p class="text-xs text-slate-300 mb-3 max-w-md mx-auto">Para mantener la transparencia y opiniones reales de compradores, debes estar registrado en la tienda.</p>
+
+            
+
+            <div class="flex flex-wrap items-center justify-center gap-2.5">
+
+              <button onclick="abrirModalRegistro()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-4 py-2 rounded-xl font-bold transition shadow-sm flex items-center gap-2">
+
+                <i class="fa-solid fa-user-plus"></i> Registrarme Ahora
+
+              </button>
+
+              <button onclick="mostrarFormIdentificar()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3.5 py-2 rounded-xl font-semibold transition border border-slate-600">
+
+                <i class="fa-solid fa-key"></i> Ya estoy registrado (Ingresar Cédula)
+
+              </button>
+
+            </div>
+
+
+
+            <!-- Mini formulario para identificarse si ya está registrado -->
+
+            <div id="formIdentificarCliente" class="hidden mt-3 max-w-sm mx-auto flex gap-2">
+
+              <input type="text" id="inputIdentificadorCliente" placeholder="Ingresa tu Cédula o Teléfono" 
+
+                     class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 w-full focus:outline-none focus:border-indigo-500">
+
+              <button onclick="verificarClienteParaComentar()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-xl font-bold transition whitespace-nowrap">
+
+                Verificar
+
+              </button>
+
+            </div>
+
+          </div>
+
+
+
+          <!-- Caso 2: Cliente Registrado y Verificado -->
+
+          <div id="panelComentarioDesbloqueado" class="hidden bg-slate-800/60 border border-slate-700 rounded-2xl p-4 space-y-3">
+
+            <div class="flex items-center justify-between border-b border-slate-700/80 pb-2">
+
+              <div class="flex items-center gap-2">
+
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+
+                <span class="text-xs text-slate-300 font-semibold">Comentando como: <strong id="lblNombreClienteComentario" class="text-white"></strong> (Cédula: <span id="lblCedulaClienteComentario" class="text-indigo-300"></span>)</span>
+
+              </div>
+
+              <button onclick="cambiarClienteComentario()" class="text-[11px] text-slate-400 hover:text-rose-400 transition underline">
+
+                No soy yo
+
+              </button>
+
+            </div>
+
+
+
+            <form onsubmit="guardarComentario(event)" class="space-y-3">
+
+              <!-- Selector de Estrellas Interactivo (1 a 5) -->
+
+              <div>
+
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Tu Calificación:</label>
+
+                <div class="flex items-center gap-3">
+
+                  <div class="star-rating flex gap-1.5 text-xl cursor-pointer" id="selectorEstrellas">
+
+                    <i class="fa-solid fa-star text-amber-400" data-val="1" onmouseover="iluminarEstrellas(1)" onclick="fijarCalificacion(1)"></i>
+
+                    <i class="fa-solid fa-star text-amber-400" data-val="2" onmouseover="iluminarEstrellas(2)" onclick="fijarCalificacion(2)"></i>
+
+                    <i class="fa-solid fa-star text-amber-400" data-val="3" onmouseover="iluminarEstrellas(3)" onclick="fijarCalificacion(3)"></i>
+
+                    <i class="fa-solid fa-star text-amber-400" data-val="4" onmouseover="iluminarEstrellas(4)" onclick="fijarCalificacion(4)"></i>
+
+                    <i class="fa-solid fa-star text-amber-400" data-val="5" onmouseover="iluminarEstrellas(5)" onclick="fijarCalificacion(5)"></i>
+
+                  </div>
+
+                  <span id="textoCalificacion" class="text-xs font-bold text-amber-300">(5/5) ¡¡Excelente!</span>
+
+                </div>
+
+              </div>
+
+
+
+              <!-- Texto del comentario -->
+
+              <div>
+
+                <textarea id="comTexto" required rows="2" placeholder="Escribe tu reseña u opiniñón sobre este producto..." 
+
+                          class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"></textarea>
+
+              </div>
+
+
+
+              <div class="flex justify-end">
+
+                <button type="submit" id="btnEnviarComentario" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow flex items-center gap-1.5">
+
+                  <i class="fa-solid fa-paper-plane"></i> Publicar Opiniñón
+
+                </button>
+
+              </div>
+
+            </form>
+
+          </div>
+
+
+
+        </div>
+
+
+
+        <!-- Lista de Comentarios Existentes -->
+
+        <div id="modalListaComentarios" class="space-y-2.5 max-h-56 overflow-y-auto pr-1"></div>
+
+      </div>
+
+
+
+    </div>
+
+  </div>
+
+
+
+  <!-- LIGHTBOX / ZOOM A PANTALLA COMPLETA DE IMÁGENES -->
+
+  <div id="modalLightbox" class="fixed inset-0 z-[120] bg-black/95 backdrop-blur-md hidden flex flex-col justify-between p-4 sm:p-6">
+
+    <div class="flex justify-between items-center text-white z-10">
+
+      <span id="lightboxContador" class="text-xs font-semibold bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700"></span>
+
+      <button onclick="cerrarLightbox()" class="bg-slate-800/80 hover:bg-slate-700 text-white w-10 h-10 rounded-full flex items-center justify-center transition">
+
+        <i class="fa-solid fa-xmark text-lg"></i>
+
+      </button>
+
+    </div>
+
+
+
+    <!-- Foto Ampliada -->
+
+    <div class="relative flex-1 flex items-center justify-center py-2 overflow-hidden">
+
+      <img id="lightboxImg" src="" alt="Zoom" class="max-w-full max-h-[82vh] object-contain rounded-xl shadow-2xl">
+
+      <!-- Flechas de navegación previa y siguiente -->
+
+      <button onclick="cambiarFotoLightbox(-1)" class="absolute left-2 top-1/2 -translate-y-1/2 bg-slate-900/70 hover:bg-slate-800 text-white w-11 h-11 rounded-full flex items-center justify-center transition border border-slate-700">
+
+        <i class="fa-solid fa-chevron-left text-lg"></i>
+
+      </button>
+
+      <button onclick="cambiarFotoLightbox(1)" class="absolute right-2 top-1/2 -translate-y-1/2 bg-slate-900/70 hover:bg-slate-800 text-white w-11 h-11 rounded-full flex items-center justify-center transition border border-slate-700">
+
+        <i class="fa-solid fa-chevron-right text-lg"></i>
+
+      </button>
+
+    </div>
+
+
+
+    <div class="text-center text-slate-400 text-xs">
+
+      Usa las flechas para explorar las fotos en alta resolución &bull; Haz clic en la X para cerrar
+
+    </div>
+
+  </div>
+
+
+
+  <!-- MODAL DE REGISTRO DE CLIENTE -->
+
+  <div id="modalRegistro" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-slate-100">
+
+      <button onclick="cerrarModalRegistro()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+
+        <i class="fa-solid fa-xmark text-lg"></i>
+
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+
+        <div class="bg-indigo-600/20 text-indigo-400 p-3 rounded-2xl border border-indigo-500/20">
+
+          <i class="fa-solid fa-address-card text-2xl"></i>
+
+        </div>
+
+        <div>
+
+          <h3 class="text-base font-bold text-white">Registro de Cliente</h3>
+
+          <p class="text-[11px] text-slate-400">Guarda tus datos para compras y opiniones</p>
+
+        </div>
+
+      </div>
+
+      <form onsubmit="guardarRegistroCliente(event)" class="space-y-3">
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Cédula o DNI *</label>
+
+          <input type="text" id="regCedula" required placeholder="Ej: V-12345678" 
+
+                 class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+        </div>
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo *</label>
+
+          <input type="text" id="regNombre" required placeholder="Nombre y Apellido" 
+
+                 class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+        </div>
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Teléfono WhatsApp *</label>
+
+          <input type="tel" id="regTelefono" required placeholder="Ej: 04141234567" 
+
+                 class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+
+          <div>
+
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Ciudad</label>
+
+            <input type="text" id="regCiudad" placeholder="Ej: Caracas" 
+
+                   class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+          </div>
+
+          <div>
+
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Dirección</label>
+
+            <input type="text" id="regDireccion" placeholder="Sector, Calle" 
+
+                   class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+
+          </div>
+
+        </div>
+
+        <div class="bg-indigo-950/50 border border-indigo-500/30 rounded-xl p-2.5 text-[11px] text-indigo-300 flex items-start gap-2 mt-2">
+          <i class="fa-solid fa-clock text-amber-400 mt-0.5"></i>
+          <div>
+            <span class="font-semibold text-slate-200">Vigencia del Registro:</span> Tu sesión local dura <strong>1 semana</strong> y tu solicitud queda registrada como <em>Pendiente</em> para validación de la tienda.
+          </div>
+        </div>
+
+        <button type="submit" id="btnGuardarRegistro" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl transition text-xs shadow-lg shadow-indigo-600/30 mt-2">
+          Guardar Registro
+        </button>
+
+      </form>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- MODAL DE PEDIDO POR WHATSAPP -->
+
+  <div id="modalPedido" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative text-slate-100">
+
+      <button id="btnCerrarModalPedido" onclick="cerrarModalPedido()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+
+        <i class="fa-solid fa-xmark text-lg"></i>
+
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+
+        <div class="bg-emerald-500/20 text-emerald-400 p-3 rounded-2xl border border-emerald-500/20">
+
+          <i class="fa-brands fa-whatsapp text-2xl"></i>
+
+        </div>
+
+        <div>
+
+          <h3 class="text-base font-bold text-white">Completar Pedido</h3>
+
+          <p class="text-[11px] text-slate-400">Se registrará en la hoja y abrirá WhatsApp</p>
+
+        </div>
+
+      </div>
+
+      <div id="pedidoResumenProducto" class="bg-slate-800 p-3 rounded-xl text-xs mb-3 text-slate-300 border border-slate-700/60"></div>
+
+      <form onsubmit="enviarPedido(event)" class="space-y-3">
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre Completo *</label>
+
+          <input type="text" id="pedNombre" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+
+        </div>
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Teléfono WhatsApp *</label>
+
+          <input type="tel" id="pedTelefono" required class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+
+        </div>
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Cédula o DNI</label>
+
+          <input type="text" id="pedCedula" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+
+        </div>
+
+        <div>
+
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Dirección de Entrega</label>
+
+          <input type="text" id="pedDireccion" placeholder="Ciudad, Sector, Referencia" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+
+        </div>
+
+        <button type="submit" id="btnConfirmarPedido" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition text-xs shadow-lg shadow-emerald-600/30 mt-2">
+
+          Confirmar y Abrir WhatsApp
+
+        </button>
+
+      </form>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- SCRIPT LOGIC -->
+
+  <script>
+
+    let productos = [];
+
+    let categoriaActiva = 'Todos';
+
+    let productoActual = null;
+
+    let fotoActualIndex = 0;
+
+    let calificacionSeleccionada = 5;
+
+
+
+    // Inicializar al cargar
+
+    document.addEventListener('DOMContentLoaded', () => {
+
+      cargarClienteLocal();
+
+      aplicarConfiguracionMarcaUI();
+
+      inicializarChatCliente();
+
+      cargarCatalogo();
+
+    });
+
+
+
+    // 1. CARGA DEL CLIENTE EN LOCALSTORAGE (VIGENCIA 1 SEMANA = 7 DÍAS)
+    const DURACION_REGISTRO_MS = 7 * 24 * 60 * 60 * 1000;
+
+    function cargarClienteLocal() {
+      const data = localStorage.getItem('cliente_catalogo');
+      if (data) {
+        try {
+          const cli = JSON.parse(data);
+          // Verificar si expiró el registro de 1 semana
+          if (cli.expiraEn && Date.now() > cli.expiraEn) {
+            console.log('El registro del cliente ha caducado tras 1 semana. Limpiando almacenamiento local.');
+            localStorage.removeItem('cliente_catalogo');
+            actualizarUIClienteIdentificado(null);
+            if (typeof actualizarEstadoFormularioComentarios === 'function') {
+              actualizarEstadoFormularioComentarios();
+            }
+            return;
+          }
+          actualizarUIClienteIdentificado(cli);
+        } catch(e) {}
+      }
+    }
+
+    function actualizarUIClienteIdentificado(cli) {
+      if (!cli) {
+        document.getElementById('txtBtnRegistro').textContent = 'Registro Cliente';
+        const lblNom = document.getElementById('lblNombreClienteComentario');
+        if (lblNom) lblNom.textContent = '';
+        const lblCed = document.getElementById('lblCedulaClienteComentario');
+        if (lblCed) lblCed.textContent = '';
+        return;
+      }
+
+      var nombreCorto = cli.nombre ? cli.nombre.split(' ')[0] : 'Perfil';
+      var badgeEstado = cli.estado === 'Confirmado' ? ' (✅)' : ' (⏳)';
+      document.getElementById('txtBtnRegistro').textContent = nombreCorto + badgeEstado;
+
+      if (document.getElementById('lblNombreClienteComentario')) {
+        document.getElementById('lblNombreClienteComentario').textContent = cli.nombre || '';
+      }
+      if (document.getElementById('lblCedulaClienteComentario')) {
+        document.getElementById('lblCedulaClienteComentario').textContent = cli.cedula || '';
+      }
+
+      // Precargar datos en modales
+      if (document.getElementById('regCedula')) document.getElementById('regCedula').value = cli.cedula || '';
+      if (document.getElementById('regNombre')) document.getElementById('regNombre').value = cli.nombre || '';
+      if (document.getElementById('regTelefono')) document.getElementById('regTelefono').value = cli.telefono || '';
+      if (document.getElementById('regCiudad')) document.getElementById('regCiudad').value = cli.ciudad || '';
+      if (document.getElementById('regDireccion')) document.getElementById('regDireccion').value = cli.direccion || '';
+
+      if (document.getElementById('pedNombre')) document.getElementById('pedNombre').value = cli.nombre || '';
+      if (document.getElementById('pedTelefono')) document.getElementById('pedTelefono').value = cli.telefono || '';
+      if (document.getElementById('pedCedula')) document.getElementById('pedCedula').value = cli.cedula || '';
+      if (document.getElementById('pedDireccion')) document.getElementById('pedDireccion').value = cli.direccion || '';
+    }
+
+
+
+    function clienteActual() {
+
+      const data = localStorage.getItem('cliente_catalogo');
+
+      if (data) {
+
+        try { return JSON.parse(data); } catch(e) {}
+
+      }
+
+      return null;
+
+    }
+
+
+
+    // 2. CARGA DE PRODUCTOS DESDE GOOGLE APPS SCRIPT
+
+    async function cargarCatalogo() {
+
+      try {
+
+        const res = await apiGet({ accion: 'obtenerCatalogo' });
+
+        if (res && res.exito && res.productos) {
+
+          if (res.categorias && res.categorias.length > 0) {
+
+            renderizarBarraCategorias(res.categorias);
+
+          }
+
+          renderizarCatalogo(res.productos);
+
+        } else if (Array.isArray(res)) {
+
+          renderizarCatalogo(res);
+
+        } else {
+
+          throw new Error('Respuesta no válida del catálogo');
+
+        }
+
+      } catch (err) {
+
+        console.error('Error cargando catálogo desde API:', err);
+
+        mostrarError(err);
+
+      }
+
+    }
+
+
+
+    function renderizarCatalogo(datos) {
+
+      productos = datos || [];
+
+      document.getElementById('cargando').classList.add('hidden');
+
+      filtrarProductos();
+
+    }
+
+
+
+    function obtenerIconoCategoria(nombre) {
+
+      const n = (nombre || '').toLowerCase();
+
+      if (n.includes('zapato') || n.includes('calzado')) return { icon: 'fa-shoe-prints', color: 'text-emerald-400' };
+
+      if (n.includes('deporte') || n.includes('fitness')) return { icon: 'fa-dumbbell', color: 'text-sky-400' };
+
+      if (n.includes('mujer') || n.includes('dama')) return { icon: 'fa-person-dress', color: 'text-pink-400' };
+
+      if (n.includes('hombre') || n.includes('caballero')) return { icon: 'fa-person', color: 'text-blue-400' };
+
+      if (n.includes('niñ') || n.includes('infantil')) return { icon: 'fa-child', color: 'text-amber-400' };
+
+      if (n.includes('beb') || n.includes('maternal')) return { icon: 'fa-baby', color: 'text-indigo-400' };
+
+      if (n.includes('carro') || n.includes('auto') || n.includes('vehiculo') || n.includes('repuesto')) return { icon: 'fa-car', color: 'text-rose-400' };
+
+      if (n.includes('accesorio') || n.includes('lente') || n.includes('reloj')) return { icon: 'fa-glasses', color: 'text-teal-400' };
+
+      if (n.includes('tecno') || n.includes('celular') || n.includes('comput')) return { icon: 'fa-mobile-screen', color: 'text-cyan-400' };
+
+      if (n.includes('hogar') || n.includes('mueble')) return { icon: 'fa-house', color: 'text-orange-400' };
+
+      if (n.includes('juguete') || n.includes('juego')) return { icon: 'fa-gamepad', color: 'text-purple-400' };
+
+      if (n.includes('ferret') || n.includes('herramienta')) return { icon: 'fa-wrench', color: 'text-yellow-400' };
+
+      return { icon: 'fa-tag', color: 'text-emerald-400' };
+
+    }
+
+
+
+    function renderizarBarraCategorias(listaCats) {
+
+      const cont = document.getElementById('contenedorCategorias');
+
+      if (!cont) return;
+
+
+
+      const catsActivas = (listaCats || []).filter(c => {
+
+        const nom = typeof c === 'string' ? c : (c.categoria || '');
+
+        return nom && nom !== 'Activos Web';
+
+      }).map(c => typeof c === 'string' ? c : c.categoria);
+
+
+
+      let html = '<button onclick="seleccionarCategoria(\'Todos\')" data-cat="Todos" class="btn-categoria ' +
+
+        (categoriaActiva === 'Todos' ? 'active whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm bg-indigo-600 text-white shadow-indigo-600/30' : 'whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800') +
+
+        ' flex items-center gap-1.5">' +
+
+        '<i class="fa-solid fa-border-all"></i> Todos' +
+
+        '</button>';
+
+
+
+      catsActivas.forEach(cat => {
+
+        const info = obtenerIconoCategoria(cat);
+
+        const isActive = categoriaActiva === cat;
+
+        html += '<button onclick="seleccionarCategoria(\'' + cat.replace(/'/g, "\\'") + '\')" data-cat="' + cat.replace(/"/g, '&quot;') + '" class="btn-categoria ' +
+
+          (isActive ? 'active whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm bg-indigo-600 text-white shadow-indigo-600/30' : 'whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-800') +
+
+          ' flex items-center gap-1.5">' +
+
+          '<i class="fa-solid ' + info.icon + ' ' + info.color + '"></i> ' + cat +
+
+          '</button>';
+
+      });
+
+
+
+      cont.innerHTML = html;
+
+    }
+
+
+
+    // 3. SELECCIÓN DE CATEGORÍA Y FILTRO (Opción B: Pestañas directas)
+
+    function seleccionarCategoria(cat) {
+
+      categoriaActiva = cat;
+
+      const btns = document.querySelectorAll('.btn-categoria');
+
+      btns.forEach(b => {
+
+        if (b.dataset.cat === cat) {
+
+          b.className = 'btn-categoria whitespace-nowrap px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm bg-indigo-600 text-white shadow-indigo-600/30';
+
+        } else {
+
+          b.className = 'btn-categoria whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/60';
+
+        }
+
+      });
+
+      filtrarProductos();
+
+    }
+
+
+
+    function filtrarProductos() {
+
+      const inputB = document.getElementById('inputBuscador') || document.getElementById('buscador');
+
+      const q = inputB ? inputB.value.trim().toLowerCase() : '';
+
+      const btnLimpiar = document.getElementById('btnLimpiarBusqueda');
+
+      if (btnLimpiar) btnLimpiar.classList.toggle('hidden', q === '');
+
+
+
+      const filtrados = productos.filter(p => {
+
+        // Filtro de Categoría Directa
+
+        let coincideCat = false;
+
+        if (categoriaActiva === 'Todos') {
+
+          coincideCat = true;
+
+        } else {
+
+          const gen = (p.genero || '').toLowerCase();
+
+          const cat = (p.categoria || '').toLowerCase();
+
+          const sub = (p.subcategoria || '').toLowerCase();
+
+          const act = (categoriaActiva || '').toLowerCase();
+
+
+
+          if (cat === act || cat.includes(act) || act.includes(cat) || sub.includes(act)) {
+
+            coincideCat = true;
+
+          } else if (act === 'hombre' || act === 'ropa hombre') {
+
+            coincideCat = gen.includes('masc') || gen.includes('hombre') || cat.includes('hombre');
+
+          } else if (act === 'mujer' || act === 'ropa mujer') {
+
+            coincideCat = gen.includes('fem') || gen.includes('mujer') || cat.includes('mujer');
+
+          } else if (act === 'niños' || act === 'ropa niños' || act.includes('niñ')) {
+
+            coincideCat = gen.includes('niñ') || cat.includes('niñ') || sub.includes('niñ');
+
+          } else if (act === 'bebés' || act === 'bebes' || act.includes('beb')) {
+
+            coincideCat = gen.includes('beb') || cat.includes('beb') || sub.includes('beb');
+
+          } else if (act.includes('zapato') || act.includes('calzado')) {
+
+            coincideCat = cat.includes('zapato') || cat.includes('calzado') || sub.includes('zapato');
+
+          } else if (act.includes('deporte') || act.includes('fitness')) {
+
+            coincideCat = cat.includes('deporte') || cat.includes('fitness') || sub.includes('deporte');
+
+          } else if (act.includes('carro') || act.includes('auto') || act.includes('vehic')) {
+
+            coincideCat = cat.includes('carro') || cat.includes('vehic') || cat.includes('auto');
+
+          } else if (act.includes('accesorio')) {
+
+            coincideCat = cat.includes('accesorio');
+
+          }
+
+        }
+
+
+
+        // Filtro de Texto
+
+        let coincideTexto = true;
+
+        if (q) {
+
+          const texto = `${p.nombre} ${p.categoria} ${p.subcategoria} ${p.descripcion}`.toLowerCase();
+
+          coincideTexto = texto.includes(q);
+
+        }
+
+
+
+        return coincideCat && coincideTexto;
+
+      });
+
+
+
+      renderizarGrid(filtrados);
+
+    }
+
+
+
+    function limpiarBuscador() {
+
+      const inputB = document.getElementById('inputBuscador') || document.getElementById('buscador');
+
+      if (inputB) inputB.value = '';
+
+      filtrarProductos();
+
+    }
+
+
+
+    function renderizarGrid(lista) {
+
+      const cont = document.getElementById('gridProductos') || document.getElementById('cuadriculaProductos');
+
+      const vacio = document.getElementById('sinResultados');
+
+      if (!cont) return;
+
+      cont.innerHTML = '';
+
+
+
+      if (lista.length === 0) {
+
+        if (vacio) vacio.classList.remove('hidden');
+
+        return;
+
+      }
+
+      if (vacio) vacio.classList.add('hidden');
+
+
+
+      lista.forEach((p, index) => {
+        const foto = p.fotos && p.fotos.length > 0 ? p.fotos[0] : 'https://via.placeholder.com/600x600?text=Sin+Foto';
+        const card = document.createElement('div');
+        card.className = 'producto-card bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-3xl overflow-hidden shadow-xl hover:shadow-indigo-500/20 hover:border-indigo-500/40 transition-all duration-300 flex flex-col justify-between group relative';
+        card.style.animation = 'cardFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) backwards';
+        card.style.animationDelay = `${Math.min(index * 45, 500)}ms`;
+        card.setAttribute('data-id', p.id);
+        card.setAttribute('data-categoria', p.categoria);
+        card.setAttribute('data-nombre', p.nombre);
+
+        card.innerHTML = `
+          <div>
+            <div class="relative h-56 bg-slate-950 overflow-hidden cursor-pointer" onclick="abrirModalProducto('${p.id}')">
+              <img src="${foto}" alt="${p.nombre}" class="img-zoom w-full h-full object-contain p-3 transition duration-500 ease-out group-hover:scale-105">
+              <div class="absolute top-3 right-3 bg-slate-900/90 backdrop-blur-md border border-slate-700/60 text-white px-3 py-1 rounded-full text-xs font-black shadow-lg">
+                $${p.precio.toFixed(2)}
+              </div>
+              <div class="absolute top-3 left-3 bg-indigo-600/90 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow">
+                ${p.categoria}
+              </div>
+            </div>
+            <div class="p-4">
+              <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block mb-1">${p.subcategoria || p.genero}</span>
+              <h3 class="font-bold text-sm text-white line-clamp-1 group-hover:text-indigo-400 transition cursor-pointer" onclick="abrirModalProducto('${p.id}')">${p.nombre}</h3>
+              <p class="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">${p.descripcion || 'Sin descripción adicional.'}</p>
+            </div>
+          </div>
+          <div class="p-4 pt-0">
+            <button onclick="abrirModalProducto('${p.id}')" class="btn-motion btn-ver-detalle w-full bg-slate-800 hover:bg-indigo-600 active:scale-95 text-white text-xs font-semibold py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 border border-slate-700 hover:border-indigo-500 shadow-md">
+              <i class="fa-solid fa-eye"></i> Ver Detalles y Comprar
+            </button>
+          </div>
+        `;
+        cont.appendChild(card);
+      });
+
+    }
+
+
+
+    // 4. MODAL DE PRODUCTO Y CONTROL DE FOTOS
+
+    function abrirModalProducto(id) {
+
+      productoActual = productos.find(p => p.id === id);
+
+      if (!productoActual) return;
+
+
+
+      fotoActualIndex = 0;
+
+      actualizarFotoPrincipal(0);
+
+
+
+      document.getElementById('modalTitulo').textContent = productoActual.nombre;
+
+      document.getElementById('modalCategoria').textContent = productoActual.categoria;
+
+      document.getElementById('modalGenero').textContent = productoActual.genero || 'Unisex';
+
+      document.getElementById('modalPrecio').textContent = `$${productoActual.precio.toFixed(2)}`;
+
+      document.getElementById('modalDescripcion').textContent = productoActual.descripcion || 'Sin descripción disponible.';
+
+      document.getElementById('modalStock').textContent = `${productoActual.stock} disponibles`;
+
+
+
+      // Miniaturas
+
+      const contMin = document.getElementById('modalMiniaturas');
+
+      contMin.innerHTML = '';
+
+      (productoActual.fotos || []).forEach((f, idx) => {
+
+        const thumb = document.createElement('div');
+
+        thumb.className = `w-14 h-14 bg-slate-950 rounded-xl overflow-hidden border cursor-pointer p-1 transition ${idx === 0 ? 'border-indigo-500 ring-2 ring-indigo-500/30' : 'border-slate-800 hover:border-slate-600'}`;
+
+        thumb.innerHTML = `<img src="${f}" class="w-full h-full object-contain">`;
+
+        thumb.onclick = () => {
+
+          actualizarFotoPrincipal(idx);
+
+          Array.from(contMin.children).forEach((el, i) => {
+
+            el.className = `w-14 h-14 bg-slate-950 rounded-xl overflow-hidden border cursor-pointer p-1 transition ${i === idx ? 'border-indigo-500 ring-2 ring-indigo-500/30' : 'border-slate-800 hover:border-slate-600'}`;
+
+          });
+
+        };
+
+        contMin.appendChild(thumb);
+
+      });
+
+
+
+      // Renderizar estado de comentarios
+
+      renderizarComentariosModal();
+
+      actualizarEstadoFormularioComentarios();
+
+
+
+      document.getElementById('modalProducto').classList.remove('hidden');
+
+    }
+
+
+
+    function actualizarFotoPrincipal(idx) {
+
+      fotoActualIndex = idx;
+
+      if (productoActual && productoActual.fotos && productoActual.fotos[idx]) {
+
+        document.getElementById('modalFotoPrincipal').src = productoActual.fotos[idx];
+
+      }
+
+    }
+
+
+
+    function cerrarModalProducto() {
+
+      document.getElementById('modalProducto').classList.add('hidden');
+
+    }
+
+
+
+    // 5. LIGHTBOX / ZOOM PANTALLA COMPLETA
+
+    function abrirLightbox() {
+
+      if (!productoActual || !productoActual.fotos) return;
+
+      document.getElementById('modalLightbox').classList.remove('hidden');
+
+      actualizarLightboxView();
+
+    }
+
+
+
+    function cerrarLightbox() {
+
+      document.getElementById('modalLightbox').classList.add('hidden');
+
+    }
+
+
+
+    function cambiarFotoLightbox(direccion) {
+
+      if (!productoActual || !productoActual.fotos) return;
+
+      const total = productoActual.fotos.length;
+
+      fotoActualIndex = (fotoActualIndex + direccion + total) % total;
+
+      actualizarLightboxView();
+
+      actualizarFotoPrincipal(fotoActualIndex);
+
+    }
+
+
+
+    function actualizarLightboxView() {
+
+      document.getElementById('lightboxImg').src = productoActual.fotos[fotoActualIndex];
+
+      document.getElementById('lightboxContador').textContent = `Foto ${fotoActualIndex + 1} de ${productoActual.fotos.length}`;
+
+    }
+
+
+
+    // 6. GESTIÓN DE COMENTARIOS Y VALIDACIÓN DE CLIENTE REGISTRADO
+
+    function actualizarEstadoFormularioComentarios() {
+
+      const cli = clienteActual();
+
+      const panelBloqueado = document.getElementById('panelComentarioBloqueado');
+
+      const panelDesbloqueado = document.getElementById('panelComentarioDesbloqueado');
+
+
+
+      if (cli && cli.cedula) {
+
+        panelBloqueado.classList.add('hidden');
+
+        panelDesbloqueado.classList.remove('hidden');
+
+        document.getElementById('lblNombreClienteComentario').textContent = cli.nombre;
+
+        document.getElementById('lblCedulaClienteComentario').textContent = cli.cedula;
+
+      } else {
+
+        panelBloqueado.classList.remove('hidden');
+
+        panelDesbloqueado.classList.add('hidden');
+
+        document.getElementById('formIdentificarCliente').classList.add('hidden');
+
+      }
+
+    }
+
+
+
+    function mostrarFormIdentificar() {
+
+      document.getElementById('formIdentificarCliente').classList.toggle('hidden');
+
+    }
+
+
+
+    async function verificarClienteParaComentar() {
+
+      const iden = document.getElementById('inputIdentificadorCliente').value.trim();
+
+      if (!iden) {
+
+        alert('Por favor ingresa tu número de Cédula o Teléfono');
+
+        return;
+
+      }
+
+
+
+      try {
+
+        const res = await apiGet({ accion: 'verificarCliente', identificador: iden });
+
+        if (res && res.existe) {
+
+          localStorage.setItem('cliente_catalogo', JSON.stringify(res));
+
+          actualizarUIClienteIdentificado(res);
+
+          actualizarEstadoFormularioComentarios();
+
+          alert(`¡Bienvenido de vuelta, ${res.nombre}! Ahora puedes publicar tu reseña.`);
+
+        } else {
+
+          alert('No encontramos esa Cédula o Teléfono registrado. Por favor completa tu registro para opinar.');
+
+          abrirModalRegistro();
+
+        }
+
+      } catch (err) {
+
+        alert('Error al verificar: ' + err.message);
+
+      }
+
+    }
+
+
+
+    function cambiarClienteComentario() {
+
+      localStorage.removeItem('cliente_catalogo');
+
+      document.getElementById('txtBtnRegistro').textContent = 'Registro Cliente';
+
+      actualizarEstadoFormularioComentarios();
+
+    }
+
+
+
+    // Selector de Estrellas Interactivo
+
+    function iluminarEstrellas(puntos) {
+
+      const estrellas = document.querySelectorAll('#selectorEstrellas .fa-star');
+
+      estrellas.forEach((s, idx) => {
+
+        if (idx < puntos) {
+
+          s.className = 'fa-solid fa-star text-amber-400';
+
+        } else {
+
+          s.className = 'fa-solid fa-star text-slate-600';
+
+        }
+
+      });
+
+    }
+
+
+
+    function fijarCalificacion(puntos) {
+
+      calificacionSeleccionada = puntos;
+
+      iluminarEstrellas(puntos);
+
+      const etiquetas = {
+
+        1: '(1/5) Muy Malo',
+
+        2: '(2/5) Malo',
+
+        3: '(3/5) Regular',
+
+        4: '(4/5) Muy Bueno',
+
+        5: '(5/5) ¡¡Excelente!'
+
+      };
+
+      document.getElementById('textoCalificacion').textContent = etiquetas[puntos] || '';
+
+    }
+
+
+
+    // Renderizar comentarios en modal
+
+    function renderizarComentariosModal() {
+
+      const lista = document.getElementById('modalListaComentarios');
+
+      const total = document.getElementById('modalTotalComentarios');
+
+      lista.innerHTML = '';
+
+
+
+      const coms = productoActual.comentarios || [];
+
+      total.textContent = coms.length;
+
+
+
+      if (coms.length === 0) {
+
+        lista.innerHTML = '<p class="text-xs text-slate-500 italic py-2">Aún no hay opiniones sobre este producto. ¡Sé el primero en opinar!</p>';
+
+        return;
+
+      }
+
+
+
+      coms.forEach(c => {
+
+        const item = document.createElement('div');
+
+        item.className = 'bg-slate-900 border border-slate-800 rounded-xl p-3';
+
+        
+
+        let estrellasHtml = '';
+
+        const pts = c.puntos || 5;
+
+        for (let i = 1; i <= 5; i++) {
+
+          estrellasHtml += `<i class="fa-solid fa-star text-[11px] ${i <= pts ? 'text-amber-400' : 'text-slate-700'}"></i>`;
+
+        }
+
+
+
+        item.innerHTML = `
+
+          <div class="flex items-center justify-between mb-1">
+
+            <span class="text-xs font-bold text-white flex items-center gap-1.5">
+
+              <i class="fa-solid fa-circle-user text-indigo-400"></i> ${c.cliente}
+
+            </span>
+
+            <span class="text-[10px] text-slate-500">${c.fecha || ''}</span>
+
+          </div>
+
+          <div class="flex items-center gap-1 mb-1.5">${estrellasHtml}</div>
+
+          <p class="text-xs text-slate-300 leading-relaxed">${c.texto}</p>
+
+        `;
+
+        lista.appendChild(item);
+
+      });
+
+    }
+
+
+
+    async function guardarComentario(e) {
+
+      e.preventDefault();
+
+      const cli = clienteActual();
+
+      if (!cli || !cli.cedula) {
+
+        alert('Debes estar registrado para publicar una opiniñón.');
+
+        return;
+
+      }
+
+
+
+      const txt = document.getElementById('comTexto').value.trim();
+
+      if (!txt) return;
+
+
+
+      const btn = document.getElementById('btnEnviarComentario');
+
+      btn.disabled = true;
+
+      btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Publicando...';
+
+
+
+      try {
+
+        const res = await apiPost({
+
+          accion: 'guardarComentario',
+
+          productoId: productoActual.id,
+
+          cedula: cli.cedula,
+
+          telefono: cli.telefono,
+
+          calificacion: calificacionSeleccionada,
+
+          comentario: txt
+
+        });
+
+        btn.disabled = false;
+
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Publicar Opiniñón';
+
+        if (res && res.exito) {
+
+          document.getElementById('comTexto').value = '';
+
+          productoActual.comentarios.unshift(res);
+
+          renderizarComentariosModal();
+
+          alert('¡¡Gracias! Tu opiniñón ha sido verificada y registrada.');
+
+        } else {
+
+          alert(res ? res.mensaje : 'Error al guardar opiniñón');
+
+        }
+
+      } catch (err) {
+
+        btn.disabled = false;
+
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Publicar Opiniñón';
+
+        alert('Error al publicar: ' + err.message);
+
+      }
+
+    }
+
+
+
+    // 7. REGISTRO DE CLIENTE
+
+    function abrirModalRegistro() {
+
+      document.getElementById('modalRegistro').classList.remove('hidden');
+
+    }
+
+    function cerrarModalRegistro() {
+
+      document.getElementById('modalRegistro').classList.add('hidden');
+
+    }
+
+
+
+    async function guardarRegistroCliente(e) {
+
+      e.preventDefault();
+
+      const datos = {
+
+        cedula: document.getElementById('regCedula').value.trim(),
+
+        nombre: document.getElementById('regNombre').value.trim(),
+
+        telefono: document.getElementById('regTelefono').value.trim(),
+
+        ciudad: document.getElementById('regCiudad').value.trim(),
+
+        direccion: document.getElementById('regDireccion').value.trim()
+
+      };
+
+
+
+      const btn = document.getElementById('btnGuardarRegistro');
+
+      btn.disabled = true;
+
+      btn.textContent = 'Guardando en la base de datos...';
+
+
+
+      try {
+
+        const res = await apiPost({
+
+          accion: 'guardarCliente',
+
+          datos: datos
+
+        });
+
+        btn.disabled = false;
+
+        btn.textContent = 'Guardar Registro';
+
+        if (res && res.exito) {
+          const cliFinal = res.cliente || datos;
+          cliFinal.expiraEn = Date.now() + DURACION_REGISTRO_MS;
+          cliFinal.fechaRegistro = cliFinal.fechaRegistro || new Date().toISOString();
+          cliFinal.estado = cliFinal.estado || 'Pendiente';
+
+          localStorage.setItem('cliente_catalogo', JSON.stringify(cliFinal));
+          actualizarUIClienteIdentificado(cliFinal);
+          actualizarEstadoFormularioComentarios();
+          cerrarModalRegistro();
+          alert('🎉 ' + (res.mensaje || 'Registro recibido con éxito. Tu cuenta está en estado Pendiente de Confirmación por el Administrador (válido por 1 semana).'));
+        } else {
+
+          alert(res ? res.mensaje : 'Error al registrar cliente');
+
+        }
+
+      } catch (err) {
+
+        btn.disabled = false;
+
+        btn.textContent = 'Guardar Registro';
+
+        alert('Error al registrar: ' + err.message);
+
+      }
+
+    }
+
+
+
+    // 8. PEDIDOS POR WHATSAPP
+
+    function abrirModalPedido() {
+
+      if (!productoActual) return;
+
+      document.getElementById('pedidoResumenProducto').innerHTML = `
+
+        <div class="flex items-center gap-3">
+
+          <img src="${productoActual.fotos[0]}" class="w-12 h-12 rounded-lg object-contain bg-slate-950 p-1">
+
+          <div>
+
+            <h4 class="font-bold text-white">${productoActual.nombre}</h4>
+
+            <span class="text-emerald-400 font-extrabold text-sm">$${productoActual.precio.toFixed(2)} USD</span>
+
+          </div>
+
+        </div>
+
+      `;
+
+      document.getElementById('modalPedido').classList.remove('hidden');
+
+    }
+
+    function cerrarModalPedido() {
+
+      document.getElementById('modalPedido').classList.add('hidden');
+
+    }
+
+
+
+    async function enviarPedido(e) {
+
+      e.preventDefault();
+
+      const pedido = {
+
+        nombre: document.getElementById('pedNombre').value.trim(),
+
+        telefono: document.getElementById('pedTelefono').value.trim(),
+
+        cedula: document.getElementById('pedCedula').value.trim(),
+
+        direccion: document.getElementById('pedDireccion').value.trim(),
+
+        detalle: `${productoActual.nombre} (ID: ${productoActual.id}) x 1 unidad`,
+
+        total: productoActual.precio
+
+      };
+
+
+
+      const btn = document.getElementById('btnConfirmarPedido');
+
+      btn.disabled = true;
+
+      btn.textContent = 'Registrando Pedido...';
+
+
+
+      try {
+
+        const res = await apiPost({
+
+          accion: 'guardarPedido',
+
+          clienteData: pedido,
+
+          productos: [{ id: productoActual.id, nombre: productoActual.nombre, precio: productoActual.precio, cantidad: 1 }],
+
+          total: productoActual.precio,
+
+          metodoEntrega: 'WhatsApp',
+
+          direccion: pedido.direccion
+
+        });
+
+        btn.disabled = false;
+
+        btn.textContent = 'Confirmar y Abrir WhatsApp';
+
+
+
+        const idPed = (res && res.idPedido) ? res.idPedido : 'PEDIDO';
+
+        const msgWA = encodeURIComponent(`¡¡Hola! Acabo de registrar mi pedido en el catálogo:\n- Código: ${idPed}\n- Producto: ${productoActual.nombre}\n- Total: $${productoActual.precio.toFixed(2)} USD\n- Nombre: ${pedido.nombre}\n- Teléfono: ${pedido.telefono}\n- Dirección: ${pedido.direccion}`);
+
+        window.open(`https://wa.me/${TELEFONO_WHATSAPP}?text=${msgWA}`, '_blank');
+
+        if (typeof confetti === 'function') {
+          confetti({
+            particleCount: 90,
+            spread: 75,
+            origin: { y: 0.6 }
+          });
+        }
+
+        cerrarModalPedido();
+
+        cerrarModalProducto();
+
+        alert('¡Pedido registrado con éxito en la base de datos!');
+
+      } catch (err) {
+
+        btn.disabled = false;
+
+        btn.textContent = 'Confirmar y Abrir WhatsApp';
+
+        alert('Error al registrar pedido: ' + err.message);
+
+      }
+
+    }
+
+
+
+    function mostrarError(err) {
+
+      document.getElementById('cargando').classList.add('hidden');
+
+      alert('Error al cargar datos del catálogo: ' + (err.message || err));
+
+    }
+
+    (function() {
+      var esGoogle = window.location.hostname.indexOf('google') !== -1;
+      var lAdmin = document.getElementById('linkFooterAdmin');
+      if (esGoogle && lAdmin) {
+        lAdmin.href = 'https://script.google.com/macros/s/AKfycbyDNwrX4Q4yZ1IQAL_xN1m4l-sauRXpe-cqpZAChMMb89S9NuGAJpg_EgXsi0i3w2meug/exec?page=admin';
+      }
+    })();
+
+    // ==========================================
+    // 9. CONFIGURACIÓN DINÁMICA DE MARCA Y LOGO
+    // ==========================================
+    let configTiendaActiva = null;
+
+    async function aplicarConfiguracionMarcaUI() {
+      try {
+        if (typeof obtenerConfiguracionMarca === 'function') {
+          configTiendaActiva = await obtenerConfiguracionMarca();
+        } else {
+          configTiendaActiva = {
+            nombreTienda: 'Catálogo Virtual',
+            sloganTienda: 'Tienda Online • Pedidos Directos',
+            logoUrl: '',
+            fuente: 'Inter',
+            telefonoWA: '584120666322'
+          };
+        }
+
+        if (configTiendaActiva.nombreTienda) {
+          const t = document.getElementById('headerTituloTienda');
+          if (t) t.textContent = configTiendaActiva.nombreTienda;
+          const ct = document.getElementById('chatNombreTienda');
+          if (ct) ct.textContent = configTiendaActiva.nombreTienda;
+          document.title = configTiendaActiva.nombreTienda + ' - Catálogo Online';
+        }
+
+        if (configTiendaActiva.sloganTienda) {
+          const s = document.getElementById('headerSloganTienda');
+          if (s) s.textContent = configTiendaActiva.sloganTienda;
+        }
+
+        if (configTiendaActiva.logoUrl && configTiendaActiva.logoUrl.trim() !== '') {
+          const img = document.getElementById('headerLogoImg');
+          const icon = document.getElementById('headerLogoIcon');
+          if (img && icon) {
+            img.src = configTiendaActiva.logoUrl.trim();
+            img.classList.remove('hidden');
+            icon.classList.add('hidden');
+          }
+        }
+
+        if (configTiendaActiva.telefonoWA) {
+          TELEFONO_WHATSAPP = configTiendaActiva.telefonoWA.trim();
+        }
+
+        if (configTiendaActiva.fuente) {
+          document.body.style.fontFamily = configTiendaActiva.fuente + ', system-ui, sans-serif';
+        }
+      } catch (err) {
+        console.warn('No se pudo aplicar configuración de marca:', err);
+      }
+    }
+
+    // ==========================================
+    // 10. SISTEMA DE CHAT WEB FLOTANTE
+    // ==========================================
+    let chatIntervalo = null;
+    let clienteChatActual = null;
+
+    function inicializarChatCliente() {
+      const data = localStorage.getItem('cliente_catalogo');
+      if (data) {
+        try {
+          clienteChatActual = JSON.parse(data);
+        } catch(e) {}
+      }
+    }
+
+    function toggleChatFlotante() {
+      const ventana = document.getElementById('ventanaChatFlotante');
+      const icono = document.getElementById('iconoChatFlotante');
+      const badge = document.getElementById('badgeChatNoLeidos');
+      
+      if (ventana.classList.contains('hidden')) {
+        ventana.classList.remove('hidden');
+        if (icono) {
+          icono.classList.remove('fa-comments');
+          icono.classList.add('fa-xmark');
+        }
+        if (badge) badge.classList.add('hidden');
+        abrirFlujoChat();
+      } else {
+        ventana.classList.add('hidden');
+        if (icono) {
+          icono.classList.remove('fa-xmark');
+          icono.classList.add('fa-comments');
+        }
+        if (chatIntervalo) clearInterval(chatIntervalo);
+      }
+    }
+
+    function abrirFlujoChat() {
+      const pasoId = document.getElementById('chatPasoIdentificacion');
+      const pasoMsg = document.getElementById('chatPasoMensajes');
+
+      if (!clienteChatActual || (!clienteChatActual.nombre && !clienteChatActual.telefono)) {
+        pasoId.classList.remove('hidden');
+        pasoMsg.classList.add('hidden');
+      } else {
+        pasoId.classList.add('hidden');
+        pasoMsg.classList.remove('hidden');
+        cargarHistorialChatCliente();
+        if (chatIntervalo) clearInterval(chatIntervalo);
+        chatIntervalo = setInterval(cargarHistorialChatCliente, 5000);
+      }
+    }
+
+    function iniciarChatDesdeIdentificacion() {
+      const nombre = document.getElementById('chatInputNombre').value.trim();
+      const tlf = document.getElementById('chatInputTelefono').value.trim();
+      if (!nombre) {
+        alert('Por favor ingresa tu nombre para continuar.');
+        return;
+      }
+      clienteChatActual = {
+        nombre: nombre,
+        telefono: tlf,
+        cedula: tlf || 'V-CHAT-' + Date.now().toString().slice(-6)
+      };
+      localStorage.setItem('cliente_catalogo', JSON.stringify(clienteChatActual));
+      actualizarUIClienteIdentificado(clienteChatActual);
+      abrirFlujoChat();
+    }
+
+    async function cargarHistorialChatCliente() {
+      if (!clienteChatActual) return;
+      const idCliente = clienteChatActual.telefono || clienteChatActual.cedula || clienteChatActual.nombre;
+      try {
+        const msgs = await obtenerHistorialChat(idCliente);
+        renderizarMensajesChat(msgs);
+      } catch (e) {}
+    }
+
+    function renderizarMensajesChat(msgs) {
+      const contenedor = document.getElementById('chatListaMensajes');
+      if (!contenedor) return;
+
+      let html = `
+        <div class="flex items-start gap-2">
+          <div class="w-7 h-7 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-xs flex-shrink-0">
+            <i class="fa-solid fa-store"></i>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700/50 text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[80%] space-y-1">
+            <p class="font-medium">¡Hola ${clienteChatActual ? clienteChatActual.nombre.split(' ')[0] : ''}! 👋 ¿Tienes dudas sobre algún producto o pedido? Escríbenos y te atenderemos.</p>
+            <span class="text-[9px] text-slate-400 block text-right">Tienda</span>
+          </div>
+        </div>
+      `;
+
+      if (Array.isArray(msgs)) {
+        for (const m of msgs) {
+          const esCliente = m.remitente === 'cliente';
+          const fechaHora = m.fecha ? new Date(m.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+          if (esCliente) {
+            html += `
+              <div class="flex items-start justify-end gap-2">
+                <div class="bg-indigo-600 text-white p-3 rounded-2xl rounded-tr-none max-w-[80%] space-y-1 shadow shadow-indigo-600/20">
+                  <p class="break-words">${m.mensaje}</p>
+                  <span class="text-[9px] text-indigo-200 block text-right">${fechaHora}</span>
+                </div>
+              </div>
+            `;
+          } else {
+            html += `
+              <div class="flex items-start gap-2">
+                <div class="w-7 h-7 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center text-xs flex-shrink-0">
+                  <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 text-slate-100 p-3 rounded-2xl rounded-tl-none max-w-[80%] space-y-1">
+                  <p class="break-words">${m.mensaje}</p>
+                  <span class="text-[9px] text-slate-400 block text-right">${fechaHora} • Administrador</span>
+                </div>
+              </div>
+            `;
+          }
+        }
+      }
+
+      contenedor.innerHTML = html;
+      contenedor.scrollTop = contenedor.scrollHeight;
+    }
+
+    async function enviarMensajeChatCliente() {
+      const input = document.getElementById('chatInputTexto');
+      const texto = input.value.trim();
+      if (!texto) return;
+
+      if (!clienteChatActual) {
+        inicializarChatCliente();
+        if (!clienteChatActual) {
+          clienteChatActual = {
+            nombre: 'Cliente Web',
+            telefono: '04120000000',
+            cedula: 'V-CHAT-' + Date.now().toString().slice(-6)
+          };
+          localStorage.setItem('cliente_catalogo', JSON.stringify(clienteChatActual));
+        }
+      }
+
+      input.value = '';
+      const idCliente = clienteChatActual.telefono || clienteChatActual.cedula || clienteChatActual.nombre || 'CLIENTE';
+
+      const nuevoMsg = {
+        id: 'MSG-' + Date.now(),
+        fecha: new Date().toISOString(),
+        clienteId: idCliente,
+        clienteNombre: clienteChatActual.nombre,
+        clienteTelefono: clienteChatActual.telefono,
+        mensaje: texto,
+        remitente: 'cliente'
+      };
+
+      const contenedor = document.getElementById('chatListaMensajes');
+      if (contenedor) {
+        const burbujaHtml = `
+          <div class="flex items-start justify-end gap-2">
+            <div class="bg-indigo-600 text-white p-3 rounded-2xl rounded-tr-none max-w-[80%] space-y-1 shadow shadow-indigo-600/20">
+              <p class="break-words">${nuevoMsg.mensaje}</p>
+              <span class="text-[9px] text-indigo-200 block text-right">Ahora</span>
+            </div>
+          </div>
+        `;
+        contenedor.insertAdjacentHTML('beforeend', burbujaHtml);
+        contenedor.scrollTop = contenedor.scrollHeight;
+      }
+
+      await enviarMensajeChat(nuevoMsg);
+      cargarHistorialChatCliente();
+    }
+  </script>
+
+  <!-- ========================================== -->
+  <!-- CHAT WEB FLOTANTE (MENSAJERÍA INTERNA) -->
+  <!-- ========================================== -->
+  <div id="contenedorChatFlotante" class="fixed bottom-5 right-5 z-50 flex flex-col items-end">
+    
+    <!-- Ventana de Chat Flotante -->
+    <div id="ventanaChatFlotante" class="hidden mb-3 w-[340px] sm:w-[380px] bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 max-h-[520px] h-[520px]">
+      
+      <!-- Encabezado de la Ventana de Chat -->
+      <div class="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 p-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="relative">
+            <div class="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-500/40 text-indigo-400 flex items-center justify-center font-bold text-sm shadow">
+              <i class="fa-solid fa-headset text-lg text-indigo-400"></i>
+            </div>
+            <span class="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
+          </div>
+          <div>
+            <h3 id="chatNombreTienda" class="text-xs font-bold text-white tracking-wide">Soporte y Ventas</h3>
+            <span class="text-[10px] text-emerald-400 flex items-center gap-1 font-medium">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> En línea ahora
+            </span>
+          </div>
+        </div>
+        <button type="button" onclick="toggleChatFlotante()" class="text-slate-400 hover:text-white p-1 rounded-lg transition text-base">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Paso 1: Identificación (si no está registrado) -->
+      <div id="chatPasoIdentificacion" class="hidden p-5 flex-1 flex flex-col justify-center items-center text-center space-y-4">
+        <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-2xl">
+          <i class="fa-regular fa-comment-dots"></i>
+        </div>
+        <div>
+          <h4 class="text-sm font-bold text-white">¡Hola! ¿En qué podemos ayudarte?</h4>
+          <p class="text-xs text-slate-400 mt-1">Ingresa tus datos para iniciar una conversación directa con nosotros.</p>
+        </div>
+        <div class="w-full space-y-2.5 text-left">
+          <input type="text" id="chatInputNombre" placeholder="Tu Nombre completo" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+          <input type="tel" id="chatInputTelefono" placeholder="Tu número de WhatsApp (ej. 04121234567)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+          <button type="button" onclick="iniciarChatDesdeIdentificacion()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2">
+            Iniciar Conversación <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Paso 2: Mensajes y Conversación -->
+      <div id="chatPasoMensajes" class="flex-1 flex flex-col overflow-hidden">
+        <div id="chatListaMensajes" class="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
+          <!-- Mensaje de bienvenida inicial -->
+          <div class="flex items-start gap-2">
+            <div class="w-7 h-7 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center text-xs flex-shrink-0">
+              <i class="fa-solid fa-store"></i>
+            </div>
+            <div class="bg-slate-800/80 border border-slate-700/50 text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[80%] space-y-1">
+              <p class="font-medium">¡Hola! 👋 Bienvenido/a a nuestra tienda. ¿Tienes dudas sobre algún producto o pedido? Escríbenos aquí y te responderemos de inmediato.</p>
+              <span class="text-[9px] text-slate-400 block text-right">Ahora</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra inferior de envío -->
+        <div class="p-3 bg-slate-950/80 border-t border-slate-800 flex items-center gap-2">
+          <input type="text" id="chatInputTexto" placeholder="Escribe tu mensaje aquí..." 
+                 onkeydown="if(event.key==='Enter'){ enviarMensajeChatCliente(); }"
+                 class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+          <button type="button" id="btnEnviarMensajeChat" onclick="enviarMensajeChatCliente()" class="bg-indigo-600 hover:bg-indigo-500 text-white w-9 h-9 rounded-xl flex items-center justify-center transition shadow shadow-indigo-600/30 flex-shrink-0">
+            <i class="fa-solid fa-paper-plane text-xs"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Botón Flotante de Activación con Motion Graphics -->
+    <div class="relative flex items-center justify-center">
+      <span class="absolute inline-flex h-12 w-12 rounded-full bg-indigo-500 opacity-40 animate-ping pointer-events-none"></span>
+      <button type="button" id="btnChatFlotante" onclick="toggleChatFlotante()" 
+              class="motion-pulse-glow group relative bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 shadow-indigo-600/50 z-10">
+        <i id="iconoChatFlotante" class="fa-solid fa-comments text-2xl transition duration-300 group-hover:rotate-12"></i>
+        <!-- Badge de no leídos -->
+        <span id="badgeChatNoLeidos" class="hidden absolute -top-1 -right-1 bg-rose-500 text-white font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-950 shadow animate-bounce">1</span>
+        <!-- Tooltip -->
+        <span class="hidden sm:group-hover:flex absolute right-16 bg-slate-900/95 backdrop-blur-md border border-slate-700 text-white text-xs font-semibold px-3.5 py-2 rounded-2xl whitespace-nowrap shadow-2xl items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span> ¿Tienes dudas? ¡Chatea aquí!
+        </span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="mt-auto py-6 border-t border-slate-900 text-center text-xs text-slate-600 flex flex-col sm:flex-row items-center justify-between px-6 max-w-7xl mx-auto w-full gap-4">
+    <p>Catalogo Digital &bull; Todos los derechos reservados</p>
+    <a id="linkFooterAdmin" href="admin.html" class="text-xs text-slate-500 hover:text-indigo-400 transition flex items-center gap-1.5"><i class="fa-solid fa-shield-halved"></i> Acceso Administrativo</a>
+  </footer>
+</body>
+
+</html>
+
