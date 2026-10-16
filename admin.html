@@ -8,7 +8,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>Panel de Administraci&oacute;n - Tienda Virtual</title>
+  <title>Panel de Administraci&oacute;n - Yolix</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
 
@@ -89,7 +89,7 @@ async function apiPost(payload) {
 // ==========================================
 const CLAVE_STORAGE_CONFIG = 'tienda_config_marca_v1';
 const CONFIG_MARCA_DEFAULT = {
-  nombreTienda: 'Catálogo Virtual',
+  nombreTienda: 'Yolix',
   sloganTienda: 'Tienda Online • Pedidos Directos',
   logoUrl: '',
   fuente: 'Inter',
@@ -2033,7 +2033,7 @@ async function eliminarClienteCascadaAPI(claveAdmin, idCliente, cedula) {
 
     async function guardarConfigMarcaAdminUI() {
       const config = {
-        nombreTienda: document.getElementById('cfgInputNombreTienda').value.trim() || 'Catálogo Virtual',
+        nombreTienda: document.getElementById('cfgInputNombreTienda').value.trim() || 'Yolix',
         sloganTienda: document.getElementById('cfgInputSloganTienda').value.trim() || 'Tienda Online • Pedidos Directos',
         logoUrl: document.getElementById('cfgInputLogoUrl').value.trim(),
         telefonoWA: document.getElementById('cfgInputTelefonoWA').value.trim() || '584120666322',

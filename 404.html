@@ -8,7 +8,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>Catálogo Digital Dinámico</title>
+  <title>Yolix - Catálogo Online</title>
 
   <!-- Tailwind CSS -->
 
@@ -179,7 +179,7 @@ async function apiPost(payload) {
 // ==========================================
 const CLAVE_STORAGE_CONFIG = 'tienda_config_marca_v1';
 const CONFIG_MARCA_DEFAULT = {
-  nombreTienda: 'Catálogo Virtual',
+  nombreTienda: 'Yolix',
   sloganTienda: 'Tienda Online • Pedidos Directos',
   logoUrl: '',
   fuente: 'Inter',
@@ -277,7 +277,7 @@ async function obtenerHistorialChat(clienteId) {
           </div>
         </div>
         <div>
-          <h1 id="headerTituloTienda" class="motion-gradient-text text-lg md:text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">Catálogo Virtual</h1>
+          <h1 id="headerTituloTienda" class="motion-gradient-text text-lg md:text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">Yolix</h1>
           <p id="headerSloganTienda" class="text-[11px] text-slate-400 font-medium">Tienda Online &bull; Pedidos Directos</p>
         </div>
       </div>
@@ -2109,7 +2109,7 @@ async function obtenerHistorialChat(clienteId) {
           configTiendaActiva = await obtenerConfiguracionMarca();
         } else {
           configTiendaActiva = {
-            nombreTienda: 'Catálogo Virtual',
+            nombreTienda: 'Yolix',
             sloganTienda: 'Tienda Online • Pedidos Directos',
             logoUrl: '',
             fuente: 'Inter',
